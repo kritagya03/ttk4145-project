@@ -27,6 +27,6 @@ func PacketReceiver(broadcastEvents chan<- []byte, receivingPort int) {
 			continue
 		}
 		fmt.Printf("Received message from %s: %s\n", receivedAddress.String(), string(packetBuffer[:packetByteCount]))
-		broadcastEvents <- packetBuffer
+		broadcastEvents <- packetBuffer[:packetByteCount]
 	}
 }

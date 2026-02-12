@@ -1,49 +1,20 @@
 package network
 
-//empty channel
+import (
+	"encoding/json"
+	"fmt"
+	"reflect"
 
-const floorCount int = 4
-const elevatorCount int = 3
-const buttonTypeCount int = 2 + elevatorCount // the number 2 is hall down and hall up, elevatorCount because one list of cab calls per elevator
-
-type CallState int
-
-const (
-	CallStateNone      CallState = 0
-	CallStateOrder     CallState = -1
-	CallStateCompleted CallState = -2
+	. "github.com/kritagya03/ttk4145-project/internal/models"
 )
 
-type Calls struct {
-	requests [floorCount][buttonTypeCount]CallState
+type typeTaggedJSON struct {
+	Type    string
+	Payload []byte
 }
 
-type MasterWorldview struct {
-	requests Calls
-}
-
-type ElevatorBehaviour int
-
-const (
-	BehaviourIdle ElevatorBehaviour = iota
-	BehaviourDoorOpen
-	BehaviourMoving
-)
-
-type ElevatorDirection int
-
-const (
-	DirectionUp ElevatorDirection = iota
-	DirectionDown
-	DirectionStop
-)
-
-type SlaveWorldview struct {
-	networkID        int
-	behaviour        ElevatorBehaviour
-	direction        ElevatorDirection
-	floorLastVisited int
-	calls            Calls
+type WorldviewType interface {
+	MasterWorldview | SlaveWorldview
 }
 
 func Server(broadcastEvents <-chan []byte,
@@ -57,13 +28,86 @@ func Server(broadcastEvents <-chan []byte,
 	for {
 		select {
 		case broadcastEvent := <-broadcastEvents:
-			break // Temporary
-		case watchdogCommand := <-watchdogNetworkCommands:
-			break // Temporary
+			fmt.Println("network_server.go case broadcastEvents. Received broadcastEvent")
+
+			var packet typeTaggedJSON
+
+			if err := json.Unmarshal(broadcastEvent, &packet); err != nil {
+				fmt.Println("network_server.go case broadcastEvents. json.Unmarshal(broadcastEvent, &packet). err=", err)
+				continue
+			}
+
+			masterWorldviewType := reflect.TypeOf((*MasterWorldview)(nil)).Elem().String()
+			slaveWorldviewType := reflect.TypeOf((*SlaveWorldview)(nil)).Elem().String()
+
+			switch packet.Type {
+			case masterWorldviewType:
+				var value MasterWorldview
+				if err := json.Unmarshal(packet.Payload, &value); err != nil {
+					fmt.Println("network_server.go case broadcastEvents. json.Unmarshal(packet.Payload, &value). err=", err)
+					continue
+				}
+				fmt.Printf("network_server.go case broadcastEvents. Sending MasterWorldview to slaveNetworkEvents channel. value = %v\n", value)
+				slaveNetworkEvents <- value
+
+			case masterWorldviewType:
+				var value SlaveWorldview
+				if err := json.Unmarshal(packet.Payload, &value); err != nil {
+					fmt.Println("network_server.go case broadcastEvents. json.Unmarshal(packet.Payload, &value). err=", err)
+					continue
+				}
+				fmt.Printf("network_server.go case broadcastEvents. Sending SlaveWorldview to masterNetworkEvents channel. value = %v\n", value)
+				masterNetworkEvents <- value
+
+			default:
+				fmt.Printf("network_server.go case broadcastEvents. packet.Type != typeNameMasterWorldview && packet.Type != typeNameSlaveWorldview. packet.Type=%v. typeNameMasterWorldview=%v, typeNameSlaveWorldview=%v\n", packet.Type, masterWorldviewType, slaveWorldviewType)
+				// Ignore packets for other types
+				continue
+			}
+
+		// case watchdogCommand := <-watchdogNetworkCommands:
+		// 	break // Temporary
+
 		case masterCommand := <-masterNetworkCommands:
-			break // Temporary
+			fmt.Println("network_server.go case masterNetworkCommands.")
+			packet := worldviewToPacket(masterCommand)
+			broadcastCommands <- packet
+
 		case slaveCommand := <-slaveNetworkCommands:
-			break // Temporary
+			fmt.Println("network_server.go case slaveNetworkCommands.")
+			packet := worldviewToPacket(slaveCommand)
+			broadcastCommands <- packet
 		}
 	}
+}
+
+func worldviewToPacket[worldviewType WorldviewType](command worldviewType) []byte {
+	typeName := reflect.TypeOf((*worldviewType)(nil)).Elem().String()
+	fmt.Printf("network_server.go worldviewToPacket. typeName = %v\n", typeName)
+
+	jsonData, err := json.Marshal(command)
+	if err != nil {
+		panic(fmt.Sprintf(
+			"Failed to encode wordlview to JSON (Type: %v, Payload: %v)",
+			typeName, jsonData))
+	}
+
+	packet, err := json.Marshal(typeTaggedJSON{
+		Type:    typeName,
+		Payload: jsonData,
+	})
+	if err != nil {
+		panic(fmt.Sprintf(
+			"Failed to encode wordlview to typeTaggedJSON (Type: %v, Payload: %v)",
+			typeName, jsonData))
+	}
+
+	bufferSize := 1024
+	if len(packet) > bufferSize {
+		panic(fmt.Sprintf(
+			"Packet too large (length: %d, max: %d)",
+			len(packet), bufferSize))
+	}
+
+	return packet
 }

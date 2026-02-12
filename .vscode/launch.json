@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch Elevator",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/elevator",
+            // "env": {
+            //     "ELEVATOR_ID": "1"
+            // }
+        }
+    ]
+}

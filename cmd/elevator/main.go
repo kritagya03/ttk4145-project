@@ -18,6 +18,7 @@ import (
 // }
 
 func main() {
+	// networkPort := getEnvInt("NETWORK_PORT")
 	// floorCount := getEnvInt("FLOOR_COUNT")
 	// elevatorCount := getEnvInt("ELEVATOR_COUNT")
 	// buttonTypeCount := 2 + elevatorCount
@@ -31,24 +32,24 @@ func main() {
 	// 	},
 	// }
 
+	const networkPort int = 30045
 	const floorCount int = 4
 	const elevatorCount int = 3
 	const buttonTypeCount int = 2 + elevatorCount // the number 2 is hall down and hall up, elevatorCount because one list of cab calls per elevator
 
-	networkPort := 30045
+	const channelBufferSize int = 16
 
-	broadcastEvents := make(chan []byte, 16) //maybe remove buffer when emptying in server
-	watchdogNetworkCommands := make(chan string, 16)
-	masterNetworkCommands := make(chan MasterWorldview, 16)
-	slaveNetworkCommands := make(chan SlaveWorldview, 16)
-	broadcastCommands := make(chan []byte, 16)
-	masterNetworkEvents := make(chan SlaveWorldview, 16)
-	slaveNetworkEvents := make(chan MasterWorldview, 16)
+	broadcastEvents := make(chan []byte, channelBufferSize) //maybe remove buffer when emptying in server
+	// watchdogNetworkCommands := make(chan string, channelBufferSize)
+	masterNetworkCommands := make(chan MasterWorldview, channelBufferSize)
+	slaveNetworkCommands := make(chan SlaveWorldview, channelBufferSize)
+	broadcastCommands := make(chan []byte, channelBufferSize)
+	masterNetworkEvents := make(chan SlaveWorldview, channelBufferSize)
+	slaveNetworkEvents := make(chan MasterWorldview, channelBufferSize)
 
-	go network.PacketSender(broadcastCommands, networkPort)
-	go network.PacketReceiver(broadcastEvents, networkPort)
+	go network.Transmitter(broadcastCommands, networkPort)
+	go network.Receiver(broadcastEvents, networkPort)
 	go network.Server(broadcastEvents,
-		watchdogNetworkCommands,
 		masterNetworkCommands,
 		slaveNetworkCommands,
 		broadcastCommands,
@@ -66,14 +67,13 @@ func main() {
 		// m := MasterWorldview{Calls: callsMaster}
 		// masterNetworkCommands <- m
 		// fmt.Println("Sendt to masterNetworkCommands.")
-		
 
 		// Test slaveNetworkCommands
 		networkID := 1
 		behaviour := BehaviourIdle
 		direction := DirectionStop
 		floorLastVisited := 0
-		
+
 		callsSlave := make([][]CallState, floorCount)
 		for i := range callsSlave {
 			callsSlave[i] = make([]CallState, buttonTypeCount)

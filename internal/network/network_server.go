@@ -17,8 +17,8 @@ type WorldviewType interface {
 	MasterWorldview | SlaveWorldview
 }
 
-func Server(broadcastEvents <-chan []byte,
-	watchdogNetworkCommands <-chan string,
+func Server(
+	broadcastEvents <-chan []byte,
 	masterNetworkCommands <-chan MasterWorldview,
 	slaveNetworkCommands <-chan SlaveWorldview,
 	broadcastCommands chan<- []byte,
@@ -28,51 +28,21 @@ func Server(broadcastEvents <-chan []byte,
 	for {
 		select {
 		case broadcastEvent := <-broadcastEvents:
-			fmt.Println("network_server.go case broadcastEvents. Received broadcastEvent")
-
-			var packet typeTaggedJSON
-
-			if err := json.Unmarshal(broadcastEvent, &packet); err != nil {
-				fmt.Println("network_server.go case broadcastEvents. json.Unmarshal(broadcastEvent, &packet). err=", err)
-				continue
-			}
-
-			masterWorldviewType := reflect.TypeOf((*MasterWorldview)(nil)).Elem().String()
-			slaveWorldviewType := reflect.TypeOf((*SlaveWorldview)(nil)).Elem().String()
-
-			switch packet.Type {
-			case masterWorldviewType:
-				var value MasterWorldview
-				if err := json.Unmarshal(packet.Payload, &value); err != nil {
-					fmt.Println("network_server.go case broadcastEvents. json.Unmarshal(packet.Payload, &value). err=", err)
-					continue
-				}
-				fmt.Printf("network_server.go case broadcastEvents. Sending MasterWorldview to slaveNetworkEvents channel. value = %v\n", value)
-				slaveNetworkEvents <- value
-
-			case masterWorldviewType:
-				var value SlaveWorldview
-				if err := json.Unmarshal(packet.Payload, &value); err != nil {
-					fmt.Println("network_server.go case broadcastEvents. json.Unmarshal(packet.Payload, &value). err=", err)
-					continue
-				}
-				fmt.Printf("network_server.go case broadcastEvents. Sending SlaveWorldview to masterNetworkEvents channel. value = %v\n", value)
-				masterNetworkEvents <- value
-
+			wordlview := packetToWorldview(broadcastEvent)
+			switch worldview := wordlview.(type) {
+			case MasterWorldview:
+				fmt.Printf("network_server.go case broadcastEvents. Sending MasterWorldview to slaveNetworkEvents channel. worldview = %v\n", worldview)
+				slaveNetworkEvents <- worldview
+			case SlaveWorldview:
+				fmt.Printf("network_server.go case broadcastEvents. Sending SlaveWorldview to masterNetworkEvents channel. worldview = %v\n", worldview)
+				masterNetworkEvents <- worldview
 			default:
-				fmt.Printf("network_server.go case broadcastEvents. packet.Type != typeNameMasterWorldview && packet.Type != typeNameSlaveWorldview. packet.Type=%v. typeNameMasterWorldview=%v, typeNameSlaveWorldview=%v\n", packet.Type, masterWorldviewType, slaveWorldviewType)
-				// Ignore packets for other types
-				continue
+				fmt.Printf("network_server.go case broadcastEvents. Received unknown worldview type: %T\n", worldview)
 			}
-
-		// case watchdogCommand := <-watchdogNetworkCommands:
-		// 	break // Temporary
-
 		case masterCommand := <-masterNetworkCommands:
 			fmt.Println("network_server.go case masterNetworkCommands.")
 			packet := worldviewToPacket(masterCommand)
 			broadcastCommands <- packet
-
 		case slaveCommand := <-slaveNetworkCommands:
 			fmt.Println("network_server.go case slaveNetworkCommands.")
 			packet := worldviewToPacket(slaveCommand)
@@ -81,15 +51,41 @@ func Server(broadcastEvents <-chan []byte,
 	}
 }
 
-func worldviewToPacket[worldviewType WorldviewType](command worldviewType) []byte {
-	typeName := reflect.TypeOf((*worldviewType)(nil)).Elem().String()
+func packetToWorldview(packet []byte) interface{} {
+	var typeTagged typeTaggedJSON
+	if errorPacket := json.Unmarshal(packet, &typeTagged); errorPacket != nil {
+		panic(fmt.Sprintf("Failed to decode packet to typeTaggedJSON: %v", errorPacket))
+	}
+
+	switch typeTagged.Type {
+	case reflect.TypeFor[MasterWorldview]().String():
+		var worldview MasterWorldview
+		if errorPayload := json.Unmarshal(typeTagged.Payload, &worldview); errorPayload != nil {
+			panic(fmt.Sprintf("Failed to decode payload to MasterWorldview: %v", errorPayload))
+		}
+		return worldview
+
+	case reflect.TypeFor[SlaveWorldview]().String():
+		var worldview SlaveWorldview
+		if errorPayload := json.Unmarshal(typeTagged.Payload, &worldview); errorPayload != nil {
+			panic(fmt.Sprintf("Failed to decode payload to SlaveWorldview: %v", errorPayload))
+		}
+		return worldview
+
+	default:
+		panic(fmt.Sprintf("Unknown worldview type: %s", typeTagged.Type))
+	}
+}
+
+func worldviewToPacket[worldviewType WorldviewType](worldview worldviewType) []byte {
+	typeName := reflect.TypeFor[worldviewType]().String()
 	fmt.Printf("network_server.go worldviewToPacket. typeName = %v\n", typeName)
 
-	jsonData, err := json.Marshal(command)
-	if err != nil {
+	jsonData, errorEncodingWorldview := json.Marshal(worldview)
+	if errorEncodingWorldview != nil {
 		panic(fmt.Sprintf(
-			"Failed to encode wordlview to JSON (Type: %v, Payload: %v)",
-			typeName, jsonData))
+			"Failed to encode wordlview to JSON (Type: %v, Payload: %v): %v",
+			typeName, jsonData, errorEncodingWorldview))
 	}
 
 	packet, err := json.Marshal(typeTaggedJSON{
@@ -102,7 +98,7 @@ func worldviewToPacket[worldviewType WorldviewType](command worldviewType) []byt
 			typeName, jsonData))
 	}
 
-	bufferSize := 1024
+	bufferSize := 1024 // TODO: Remove hardcoded buffer size
 	if len(packet) > bufferSize {
 		panic(fmt.Sprintf(
 			"Packet too large (length: %d, max: %d)",

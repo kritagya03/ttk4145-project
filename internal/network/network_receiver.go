@@ -5,20 +5,20 @@ import (
 	"net"
 )
 
-func PacketReceiver(broadcastEvents chan<- []byte, receivingPort int) {
+func Receiver(broadcastEvents chan<- []byte, receivingPort int) {
 	receivingAddress := fmt.Sprintf(":%d", receivingPort)
 	udpAddress, errorResolve := net.ResolveUDPAddr("udp4", receivingAddress)
 	if errorResolve != nil {
-		fmt.Println("Error resolving UDP Address:", errorResolve)
+		panic(fmt.Sprintf("Error resolving UDP Address: %v", errorResolve))
 	}
 
 	receiveConnection, errorListen := net.ListenUDP("udp4", udpAddress)
 	if errorListen != nil {
-		fmt.Println("Error listening:", errorListen)
+		panic(fmt.Sprintf("Error listening: %v", errorListen))
 	}
 	defer receiveConnection.Close()
 
-	packetBuffer := make([]byte, 1024)
+	packetBuffer := make([]byte, 1024) // TODO: Remove hardcoded buffer size
 
 	for {
 		packetByteCount, receivedAddress, readError := receiveConnection.ReadFromUDP(packetBuffer)

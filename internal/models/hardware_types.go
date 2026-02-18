@@ -3,11 +3,11 @@ package models
 type Direction int
 
 // Error because also implemented in types.go
-const (
-	DirectionUp Direction = iota
-	DirectionDown
-	DirectionStop
-)
+// const (
+// 	DirectionUp Direction = iota
+// 	DirectionDown
+// 	DirectionStop
+// )
 
 type CallType int
 

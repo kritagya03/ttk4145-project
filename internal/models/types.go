@@ -39,3 +39,9 @@ type SlaveWorldview struct {
 	FloorLastVisited int
 	Calls            CallsMatrix
 }
+
+type MasterTimeout int
+type SlaveTimeout int
+
+
+

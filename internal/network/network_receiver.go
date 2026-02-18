@@ -3,6 +3,7 @@ package network
 import (
 	"fmt"
 	"net"
+	. "github.com/kritagya03/ttk4145-project/internal/models"
 )
 
 func Receiver(broadcastEvents chan<- []byte, receivingPort int) {
@@ -18,7 +19,7 @@ func Receiver(broadcastEvents chan<- []byte, receivingPort int) {
 	}
 	defer receiveConnection.Close()
 
-	packetBuffer := make([]byte, 1024) // TODO: Remove hardcoded buffer size
+	packetBuffer := make([]byte, NetworkBufferSize)
 
 	for {
 		packetByteCount, receivedAddress, readError := receiveConnection.ReadFromUDP(packetBuffer)

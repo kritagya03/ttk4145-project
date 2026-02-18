@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"time"
 
 	. "github.com/kritagya03/ttk4145-project/internal/models"
 )
@@ -17,25 +18,73 @@ type WorldviewType interface {
 	MasterWorldview | SlaveWorldview
 }
 
+func isValidNetworkID(networkID int, elevatorCount int) bool {
+	return networkID > 0 && networkID <= elevatorCount
+}
+
+func resetTimer(timer *time.Timer) {
+	if !timer.Stop() {
+		select {
+		case <-timer.C:
+		default:
+		}
+	}
+	timer.Reset(HeartbeatTimeout)
+	fmt.Println("network_server.go resetTimer - Timer has been reset.")
+}
+
 func Server(
 	broadcastEvents <-chan []byte,
 	masterNetworkCommands <-chan MasterWorldview,
 	slaveNetworkCommands <-chan SlaveWorldview,
 	broadcastCommands chan<- []byte,
-	masterNetworkEvents chan<- SlaveWorldview,
-	slaveNetworkEvents chan<- MasterWorldview) {
+	masterNetworkEvents chan<- interface{},
+	slaveNetworkEvents chan<- MasterWorldview,
+	elevatorCount int) {
+
+	masterHeartbeatTimer := time.NewTimer(HeartbeatTimeout)
+	masterHeartbeatTimer.Stop()
+
+	slaveHeartbeatTimers := make([]*time.Timer, elevatorCount)
+	for i := 0; i < elevatorCount; i++ {
+		slaveHeartbeatTimers[i] = time.NewTimer(HeartbeatTimeout)
+		slaveHeartbeatTimers[i].Stop()
+	}
+
+	slaveTimeouts := make(chan int, elevatorCount)
+
+	for i := range elevatorCount {
+		go func(i int, timer *time.Timer) {
+			for {
+				<-timer.C
+				slaveTimeouts <- i + 1
+			}
+		}(i, slaveHeartbeatTimers[i])
+	}
 
 	for {
 		select {
 		case broadcastEvent := <-broadcastEvents:
+			fmt.Println("network_server.go case broadcastEvents. Received broadcast event, attempting to decode worldview.")
 			wordlview := packetToWorldview(broadcastEvent)
+			if wordlview == nil {
+				fmt.Println("network_server.go case broadcastEvents. Received invalid packet, skipping.")
+				continue
+			}
 			switch worldview := wordlview.(type) {
 			case MasterWorldview:
 				fmt.Printf("network_server.go case broadcastEvents. Sending MasterWorldview to slaveNetworkEvents channel. worldview = %v\n", worldview)
 				slaveNetworkEvents <- worldview
+				resetTimer(masterHeartbeatTimer)
 			case SlaveWorldview:
+				if !isValidNetworkID(worldview.NetworkID, elevatorCount) {
+					fmt.Printf("network_server.go case broadcastEvents. Received SlaveWorldview with invalid NetworkID: %d\n", worldview.NetworkID)
+					continue
+				}
 				fmt.Printf("network_server.go case broadcastEvents. Sending SlaveWorldview to masterNetworkEvents channel. worldview = %v\n", worldview)
 				masterNetworkEvents <- worldview
+				resetTimer(slaveHeartbeatTimers[worldview.NetworkID-1])
+				fmt.Printf("network_server.go case broadcastEvents. Reset slave heartbeat timer for NetworkID %d\n", worldview.NetworkID)
 			default:
 				fmt.Printf("network_server.go case broadcastEvents. Received unknown worldview type: %T\n", worldview)
 			}
@@ -47,33 +96,46 @@ func Server(
 			fmt.Println("network_server.go case slaveNetworkCommands.")
 			packet := worldviewToPacket(slaveCommand)
 			broadcastCommands <- packet
+		case <-masterHeartbeatTimer.C:
+			fmt.Println("network_server.go case masterHeartbeatTimer.C. Master heartbeat timeout, taking appropriate action.")
+			masterNetworkEvents <- MasterTimeout(0)
+			// Take appropriate action for master timeout
+		case slaveID := <-slaveTimeouts:
+			fmt.Printf("network_server.go case slaveTimeouts. Slave %d heartbeat timeout, taking appropriate action.\n", slaveID)
+			masterNetworkEvents <- SlaveTimeout(slaveID)
+			// Take appropriate action for slave timeout
 		}
 	}
 }
 
+// Don't panic incase of receiving packets from unintented senders.
 func packetToWorldview(packet []byte) interface{} {
 	var typeTagged typeTaggedJSON
 	if errorPacket := json.Unmarshal(packet, &typeTagged); errorPacket != nil {
-		panic(fmt.Sprintf("Failed to decode packet to typeTaggedJSON: %v", errorPacket))
+		fmt.Println("Failed to decode packet to typeTaggedJSON: %v", errorPacket)
+		return nil
 	}
 
 	switch typeTagged.Type {
 	case reflect.TypeFor[MasterWorldview]().String():
 		var worldview MasterWorldview
 		if errorPayload := json.Unmarshal(typeTagged.Payload, &worldview); errorPayload != nil {
-			panic(fmt.Sprintf("Failed to decode payload to MasterWorldview: %v", errorPayload))
+			fmt.Println("Failed to decode payload to MasterWorldview: %v", errorPayload)
+			return nil
 		}
 		return worldview
 
 	case reflect.TypeFor[SlaveWorldview]().String():
 		var worldview SlaveWorldview
 		if errorPayload := json.Unmarshal(typeTagged.Payload, &worldview); errorPayload != nil {
-			panic(fmt.Sprintf("Failed to decode payload to SlaveWorldview: %v", errorPayload))
+			fmt.Println("Failed to decode payload to SlaveWorldview: %v", errorPayload)
+			return nil
 		}
 		return worldview
 
 	default:
-		panic(fmt.Sprintf("Unknown worldview type: %s", typeTagged.Type))
+		fmt.Println("Unknown worldview type: %s", typeTagged.Type)
+		return nil
 	}
 }
 
@@ -98,11 +160,10 @@ func worldviewToPacket[worldviewType WorldviewType](worldview worldviewType) []b
 			typeName, jsonData))
 	}
 
-	bufferSize := 1024 // TODO: Remove hardcoded buffer size
-	if len(packet) > bufferSize {
+	if len(packet) > NetworkBufferSize {
 		panic(fmt.Sprintf(
 			"Packet too large (length: %d, max: %d)",
-			len(packet), bufferSize))
+			len(packet), NetworkBufferSize))
 	}
 
 	return packet

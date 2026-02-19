@@ -40,6 +40,8 @@ type SlaveWorldview struct {
 	Calls            CallsMatrix
 }
 
+type NewMasterConnection int
+type NewSlaveConnection int
 type MasterTimeout int
 type SlaveTimeout int
 

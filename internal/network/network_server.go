@@ -22,6 +22,7 @@ func isValidNetworkID(networkID int, elevatorCount int) bool {
 	return networkID > 0 && networkID <= elevatorCount
 }
 
+// TODO: This is reused from master.go
 func resetTimer(timer *time.Timer) {
 	if !timer.Stop() {
 		select {
@@ -32,6 +33,8 @@ func resetTimer(timer *time.Timer) {
 	timer.Reset(HeartbeatTimeout)
 	fmt.Println("network_server.go resetTimer - Timer has been reset.")
 }
+
+// TODO: Add NewSlaveConnection
 
 func Server(
 	broadcastEvents <-chan []byte,
@@ -44,11 +47,14 @@ func Server(
 
 	masterHeartbeatTimer := time.NewTimer(HeartbeatTimeout)
 	masterHeartbeatTimer.Stop()
+	masterIsTimedOut := true
 
 	slaveHeartbeatTimers := make([]*time.Timer, elevatorCount)
-	for i := 0; i < elevatorCount; i++ {
+	slaveIsTimedOutList := make([]bool, elevatorCount)
+	for i := range elevatorCount {
 		slaveHeartbeatTimers[i] = time.NewTimer(HeartbeatTimeout)
 		slaveHeartbeatTimers[i].Stop()
+		slaveIsTimedOutList[i] = true
 	}
 
 	slaveTimeouts := make(chan int, elevatorCount)
@@ -73,13 +79,25 @@ func Server(
 			}
 			switch worldview := wordlview.(type) {
 			case MasterWorldview:
+				if masterIsTimedOut {
+					fmt.Println("network_server.go case broadcastEvents. Received MasterWorldview while master was previously timed out, sending MasterWorldview to masterNetworkEvents channel to trigger transition to active.")
+					masterNetworkEvents <- NewMasterConnection(0)
+					masterIsTimedOut = false
+				}
 				fmt.Printf("network_server.go case broadcastEvents. Sending MasterWorldview to slaveNetworkEvents channel. worldview = %v\n", worldview)
+				masterNetworkEvents <- worldview // Combining multiple masters after network partition
 				slaveNetworkEvents <- worldview
 				resetTimer(masterHeartbeatTimer)
 			case SlaveWorldview:
 				if !isValidNetworkID(worldview.NetworkID, elevatorCount) {
 					fmt.Printf("network_server.go case broadcastEvents. Received SlaveWorldview with invalid NetworkID: %d\n", worldview.NetworkID)
 					continue
+				}
+				if slaveIsTimedOutList[worldview.NetworkID-1] {
+					fmt.Printf("network_server.go case broadcastEvents. Received SlaveWorldview from NetworkID %d while slave was previously timed out, sending NewSlaveConnection to masterNetworkEvents channel to trigger appropriate handling.\n", worldview.NetworkID)
+					masterNetworkEvents <- NewSlaveConnection(worldview.NetworkID)
+					// masterNetworkEvents <- worldview // TODO: should the SlaveWorldview be sent to masterNetworkEvents?
+					slaveIsTimedOutList[worldview.NetworkID-1] = false
 				}
 				fmt.Printf("network_server.go case broadcastEvents. Sending SlaveWorldview to masterNetworkEvents channel. worldview = %v\n", worldview)
 				masterNetworkEvents <- worldview
@@ -98,12 +116,13 @@ func Server(
 			broadcastCommands <- packet
 		case <-masterHeartbeatTimer.C:
 			fmt.Println("network_server.go case masterHeartbeatTimer.C. Master heartbeat timeout, taking appropriate action.")
+			masterIsTimedOut = true
 			masterNetworkEvents <- MasterTimeout(0)
 			// Take appropriate action for master timeout
 		case slaveID := <-slaveTimeouts:
 			fmt.Printf("network_server.go case slaveTimeouts. Slave %d heartbeat timeout, taking appropriate action.\n", slaveID)
 			masterNetworkEvents <- SlaveTimeout(slaveID)
-			// Take appropriate action for slave timeout
+			slaveIsTimedOutList[slaveID-1] = true
 		}
 	}
 }

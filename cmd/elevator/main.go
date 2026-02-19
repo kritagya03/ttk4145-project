@@ -72,9 +72,9 @@ func main() {
 	// 	testSendWorldview(networkID, floorCount, buttonTypeCount, elevatorCount, masterNetworkCommands, slaveNetworkCommands)
 	// }
 	// testSendSlaveWorldview(networkID, floorCount, buttonTypeCount, elevatorCount, masterNetworkCommands, slaveNetworkCommands)
-	testSendMasterWorldview(floorCount, buttonTypeCount, masterNetworkCommands)
-	time.Sleep(2 * time.Second)
-	testSendMasterWorldview(floorCount, buttonTypeCount, masterNetworkCommands)
+	// testSendMasterWorldview(floorCount, buttonTypeCount, masterNetworkCommands)
+	// time.Sleep(2 * time.Second)
+	// testSendMasterWorldview(floorCount, buttonTypeCount, masterNetworkCommands)
 	time.Sleep(2 * time.Second)
 }
 

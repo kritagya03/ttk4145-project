@@ -23,12 +23,13 @@ const (
 
 func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<- MasterWorldview, networkID int, floorCount int, buttonTypeCount int, elevatorCount int) {
 	masterWorldview := getDefaultMasterWorldview(floorCount, buttonTypeCount)
-	slaveWorldviewList := make(SlaveWorldview, elevatorCount)
+	slaveWorldviewList := make([]SlaveWorldview, elevatorCount)
 	currentMasterState := MasterCandidate
 	changeMasterState(currentMasterState)
+	assignCalls(masterWorldview, slaveWorldviewList, elevatorCount, floorCount) // testing
 	for {
-		event := <-masterNetworkEvents
-		switch v := event.(type) {
+		message := <-masterNetworkEvents
+		switch event := message.(type) {
 		case SlaveWorldview:
 			// var slaveWorldview SlaveWorldview = event
 			slaveWorldview := event
@@ -37,24 +38,22 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 				continue
 			}
 			slaveWorldviewList[slaveWorldview.NetworkID-1] = slaveWorldview
-			masterWorldview = getNewMasterWorldview(masterWorldview, slaveWorldview, elevatorCount)
-			// Maybe call assignCalls from inside getNewMasterWorldview such that the master doen't accidentally send a call marked CallOrder with its heartbeat
-			masterWorldview = assignCalls(masterWorldview, slaveWorldviewList, elevatorCount, floorCount)
+			masterWorldview = getNewMasterWorldview(masterWorldview, slaveWorldview, slaveWorldviewList, elevatorCount, floorCount)
 			// From the SlaveWorldview, proccess calls that are marked as Order and Completed, and update the MasterWorldview accordingly. Then supdate our MasterWorldview
 		case MasterTimeout:
-			fmt.Printf("master.go case masterNetworkEvents. Received Master Timeout: %d\n", v)
+			fmt.Printf("master.go case masterNetworkEvents. Received Master Timeout: %d\n", event)
 			if currentMasterState == MasterActive {
 				continue
 			}
 			changeMasterState(MasterCandidate)
 		case SlaveTimeout:
 			slaveID := event
-			fmt.Printf("master.go case masterNetworkEvents. Received Slave Timeout: %d\n", v)
+			fmt.Printf("master.go case masterNetworkEvents. Received Slave Timeout: %d\n", slaveID)
 			if currentMasterState != MasterActive {
 				continue
 			}
 		default:
-			fmt.Printf("master.go case masterNetworkEvents. Unknown type: %T\n", v)
+			fmt.Printf("master.go case masterNetworkEvents. Unknown type: %T\n", event)
 		}
 	}
 }
@@ -83,8 +82,7 @@ func isCallAssignedToSlave(callState CallState, elevatorCount int) bool {
 }
 
 // Assumes master matrix and slave matrix are of the same dimensions
-//Change name to UpdateMasterWorldview
-func getNewMasterWorldview(masterWorldview MasterWorldview, slaveWorldview SlaveWorldview, elevatorCount int) MasterWorldview {
+func getNewMasterWorldview(masterWorldview MasterWorldview, slaveWorldview SlaveWorldview, slaveWorldviewList []SlaveWorldview, elevatorCount int, floorCount int) MasterWorldview {
 	masterMatrix := masterWorldview.Calls.Matrix
 	slaveMatrix := slaveWorldview.Calls.Matrix
 	for floor := range masterMatrix {
@@ -98,6 +96,7 @@ func getNewMasterWorldview(masterWorldview MasterWorldview, slaveWorldview Slave
 		}
 	}
 	masterWorldview.Calls.Matrix = masterMatrix
+	assignCalls(masterWorldview, slaveWorldviewList, elevatorCount, floorCount)
 	return masterWorldview
 }
 

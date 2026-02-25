@@ -1,5 +1,7 @@
 package models
 
+import "fmt"
+
 type ElevatorBehaviour int
 
 const (
@@ -24,12 +26,26 @@ const (
 	CallStateCompleted CallState = -2
 )
 
+func (callState CallState) String() string {
+	switch callState {
+	case CallStateNone:
+		return "None"
+	case CallStateOrder:
+		return "Order"
+	case CallStateCompleted:
+		return "Completed"
+	default:
+		return fmt.Sprintf("Assigned:%d", callState)
+	}
+}
+
 type CallsMatrix struct {
 	Matrix [][]CallState
 }
 
 type MasterWorldview struct {
-	Calls CallsMatrix
+	NetworkID int
+	Calls     CallsMatrix
 }
 
 type SlaveWorldview struct {
@@ -41,9 +57,12 @@ type SlaveWorldview struct {
 }
 
 type NewMasterConnection int
-type NewSlaveConnection int
 type MasterTimeout int
-type SlaveTimeout int
 
+type NewSlaveConnection struct {
+	NetworkID int
+}
 
-
+type SlaveTimeout struct {
+	NetworkID int
+}

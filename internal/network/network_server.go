@@ -43,6 +43,7 @@ func Server(
 	broadcastCommands chan<- []byte,
 	masterNetworkEvents chan<- interface{},
 	slaveNetworkEvents chan<- MasterWorldview,
+	networkID int,
 	elevatorCount int) {
 
 	masterHeartbeatTimer := time.NewTimer(HeartbeatTimeout)
@@ -59,28 +60,28 @@ func Server(
 
 	slaveTimeouts := make(chan int, elevatorCount)
 
-	for i := range elevatorCount {
+	for slaveIndex := range elevatorCount {
 		go func(i int, timer *time.Timer) {
 			for {
 				<-timer.C
-				slaveTimeouts <- i + 1
+				slaveTimeouts <- slaveIndex + 1 // TODO: maybe implement NetworkID type?
 			}
-		}(i, slaveHeartbeatTimers[i])
+		}(slaveIndex, slaveHeartbeatTimers[slaveIndex])
 	}
 
 	for {
 		select {
 		case broadcastEvent := <-broadcastEvents:
 			fmt.Println("network_server.go case broadcastEvents. Received broadcast event, attempting to decode worldview.")
-			wordlview := packetToWorldview(broadcastEvent)
-			if wordlview == nil {
+			worldview := packetToWorldview(broadcastEvent)
+			if worldview == nil {
 				fmt.Println("network_server.go case broadcastEvents. Received invalid packet, skipping.")
 				continue
 			}
-			switch worldview := wordlview.(type) {
+			switch worldview := worldview.(type) {
 			case MasterWorldview:
-				if masterIsTimedOut {
-					fmt.Println("network_server.go case broadcastEvents. Received MasterWorldview while master was previously timed out, sending MasterWorldview to masterNetworkEvents channel to trigger transition to active.")
+				if masterIsTimedOut && worldview.NetworkID != networkID {
+					fmt.Println("network_server.go case broadcastEvents. Received MasterWorldview while master was previously timed out, sending MasterWorldview to masterNetworkEvents channel.")
 					masterNetworkEvents <- NewMasterConnection(0)
 					masterIsTimedOut = false
 				}
@@ -95,7 +96,7 @@ func Server(
 				}
 				if slaveIsTimedOutList[worldview.NetworkID-1] {
 					fmt.Printf("network_server.go case broadcastEvents. Received SlaveWorldview from NetworkID %d while slave was previously timed out, sending NewSlaveConnection to masterNetworkEvents channel to trigger appropriate handling.\n", worldview.NetworkID)
-					masterNetworkEvents <- NewSlaveConnection(worldview.NetworkID)
+					masterNetworkEvents <- NewSlaveConnection{NetworkID: worldview.NetworkID}
 					// masterNetworkEvents <- worldview // TODO: should the SlaveWorldview be sent to masterNetworkEvents?
 					slaveIsTimedOutList[worldview.NetworkID-1] = false
 				}
@@ -115,14 +116,14 @@ func Server(
 			packet := worldviewToPacket(slaveCommand)
 			broadcastCommands <- packet
 		case <-masterHeartbeatTimer.C:
-			fmt.Println("network_server.go case masterHeartbeatTimer.C. Master heartbeat timeout, taking appropriate action.")
+			fmt.Println("network_server.go case masterHeartbeatTimer.C. Master heartbeat timeout.")
 			masterIsTimedOut = true
 			masterNetworkEvents <- MasterTimeout(0)
 			// Take appropriate action for master timeout
-		case slaveID := <-slaveTimeouts:
-			fmt.Printf("network_server.go case slaveTimeouts. Slave %d heartbeat timeout, taking appropriate action.\n", slaveID)
-			masterNetworkEvents <- SlaveTimeout(slaveID)
-			slaveIsTimedOutList[slaveID-1] = true
+		case slaveNetworkID := <-slaveTimeouts:
+			fmt.Printf("network_server.go case slaveTimeouts. Slave %d heartbeat timeout.\n", slaveNetworkID)
+			masterNetworkEvents <- SlaveTimeout{NetworkID: slaveNetworkID}
+			slaveIsTimedOutList[slaveNetworkID-1] = true
 		}
 	}
 }
@@ -131,7 +132,7 @@ func Server(
 func packetToWorldview(packet []byte) interface{} {
 	var typeTagged typeTaggedJSON
 	if errorPacket := json.Unmarshal(packet, &typeTagged); errorPacket != nil {
-		fmt.Println("Failed to decode packet to typeTaggedJSON: %v", errorPacket)
+		fmt.Printf("Failed to decode packet to typeTaggedJSON: %v\n", errorPacket)
 		return nil
 	}
 
@@ -139,7 +140,7 @@ func packetToWorldview(packet []byte) interface{} {
 	case reflect.TypeFor[MasterWorldview]().String():
 		var worldview MasterWorldview
 		if errorPayload := json.Unmarshal(typeTagged.Payload, &worldview); errorPayload != nil {
-			fmt.Println("Failed to decode payload to MasterWorldview: %v", errorPayload)
+			fmt.Printf("Failed to decode payload to MasterWorldview: %v\n", errorPayload)
 			return nil
 		}
 		return worldview
@@ -147,13 +148,13 @@ func packetToWorldview(packet []byte) interface{} {
 	case reflect.TypeFor[SlaveWorldview]().String():
 		var worldview SlaveWorldview
 		if errorPayload := json.Unmarshal(typeTagged.Payload, &worldview); errorPayload != nil {
-			fmt.Println("Failed to decode payload to SlaveWorldview: %v", errorPayload)
+			fmt.Printf("Failed to decode payload to SlaveWorldview: %v\n", errorPayload)
 			return nil
 		}
 		return worldview
 
 	default:
-		fmt.Println("Unknown worldview type: %s", typeTagged.Type)
+		fmt.Printf("Unknown worldview type: %s\n", typeTagged.Type)
 		return nil
 	}
 }
@@ -165,7 +166,7 @@ func worldviewToPacket[worldviewType WorldviewType](worldview worldviewType) []b
 	jsonData, errorEncodingWorldview := json.Marshal(worldview)
 	if errorEncodingWorldview != nil {
 		panic(fmt.Sprintf(
-			"Failed to encode wordlview to JSON (Type: %v, Payload: %v): %v",
+			"Failed to encode worldview to JSON (Type: %v, Payload: %v): %v",
 			typeName, jsonData, errorEncodingWorldview))
 	}
 
@@ -175,7 +176,7 @@ func worldviewToPacket[worldviewType WorldviewType](worldview worldviewType) []b
 	})
 	if err != nil {
 		panic(fmt.Sprintf(
-			"Failed to encode wordlview to typeTaggedJSON (Type: %v, Payload: %v)",
+			"Failed to encode worldview to typeTaggedJSON (Type: %v, Payload: %v)",
 			typeName, jsonData))
 	}
 

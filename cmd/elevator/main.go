@@ -61,6 +61,7 @@ func main() {
 		broadcastCommands,
 		masterNetworkEvents,
 		slaveNetworkEvents,
+		networkID,
 		elevatorCount)
 	go master.Server(masterNetworkEvents, masterNetworkCommands, networkID, floorCount, buttonTypeCount, elevatorCount)
 	go slave.Server(slaveNetworkEvents, slaveNetworkCommands)
@@ -71,10 +72,16 @@ func main() {
 	// 	time.Sleep(time.Second)
 	// 	testSendWorldview(networkID, floorCount, buttonTypeCount, elevatorCount, masterNetworkCommands, slaveNetworkCommands)
 	// }
-	// testSendSlaveWorldview(networkID, floorCount, buttonTypeCount, elevatorCount, masterNetworkCommands, slaveNetworkCommands)
-	// testSendMasterWorldview(floorCount, buttonTypeCount, masterNetworkCommands)
+	testSendSlaveWorldview(networkID, floorCount, buttonTypeCount, elevatorCount, masterNetworkCommands, slaveNetworkCommands)
 	// time.Sleep(2 * time.Second)
-	// testSendMasterWorldview(floorCount, buttonTypeCount, masterNetworkCommands)
+	masterWorldview := testGetDefaultMasterWorldview(networkID, floorCount, buttonTypeCount)
+	masterWorldview.Calls.Matrix[3][1] = 1
+	masterWorldview.Calls.Matrix[2][3] = 1
+	masterWorldview.Calls.Matrix[3][4] = 3
+	testSendMasterWorldview(masterWorldview, masterNetworkCommands)
+	masterWorldview.Calls.Matrix[1][1] = CallStateOrder
+	masterWorldview.Calls.Matrix[2][0] = CallStateOrder
+	testSendMasterWorldview(masterWorldview, masterNetworkCommands)
 	time.Sleep(2 * time.Second)
 }
 
@@ -98,14 +105,18 @@ func testSendSlaveWorldview(networkID int, floorCount int, buttonTypeCount int, 
 	fmt.Println("Sendt to slaveNetworkCommands.")
 }
 
-func testSendMasterWorldview(floorCount int, buttonTypeCount int, masterNetworkCommands chan<- MasterWorldview) {
-	callsMaster := make([][]CallState, floorCount)
-	for i := range callsMaster {
-		callsMaster[i] = make([]CallState, buttonTypeCount)
+func testGetDefaultMasterWorldview(networkID int, floorCount int, buttonTypeCount int) MasterWorldview {
+	calls := make([][]CallState, floorCount)
+	for i := range calls {
+		calls[i] = make([]CallState, buttonTypeCount)
 	}
-	masterWorld := MasterWorldview{
-		Calls: CallsMatrix{Matrix: callsMaster},
+	return MasterWorldview{
+		NetworkID: networkID,
+		Calls:     CallsMatrix{Matrix: calls},
 	}
-	masterNetworkCommands <- masterWorld
+}
+
+func testSendMasterWorldview(masterWorldview MasterWorldview, masterNetworkCommands chan<- MasterWorldview) {
+	masterNetworkCommands <- masterWorldview
 	fmt.Println("Sendt to masterNetworkCommands.")
 }

@@ -133,6 +133,7 @@ func packetToWorldview(packet []byte) interface{} {
 	var typeTagged typeTaggedJSON
 	if errorPacket := json.Unmarshal(packet, &typeTagged); errorPacket != nil {
 		fmt.Printf("Failed to decode packet to typeTaggedJSON: %v\n", errorPacket)
+		// panic(fmt.Sprintf("Failed to decode packet to typeTaggedJSON: %v\n", errorPacket)) // TODO: temporary
 		return nil
 	}
 

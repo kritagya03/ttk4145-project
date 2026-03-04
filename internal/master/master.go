@@ -135,7 +135,7 @@ func getMergedMasterWorldview(masterWorldviewBase MasterWorldview, masterWorldvi
 	// TODO: currently assuming both matrixes have the same dimensions
 	for floor := range matrixNew {
 		for buttonType := range matrixNew[floor] {
-			if matrixMerged[floor][buttonType] == CallStateNone && isCallAssignedToSlave(matrixNew[floor][buttonType], elevatorCount) {
+			if matrixMerged[floor][buttonType] == CallStateNone && isCallAssigned(matrixNew[floor][buttonType], elevatorCount) {
 				matrixMerged[floor][buttonType] = matrixNew[floor][buttonType]
 			}
 		}
@@ -167,7 +167,7 @@ func getDefaultSlaveWorldview(networkID int) SlaveWorldview {
 	}
 }
 
-func isCallAssignedToSlave(callState CallState, elevatorCount int) bool {
+func isCallAssigned(callState CallState, elevatorCount int) bool {
 	if int(callState) > 0 && int(callState) <= elevatorCount {
 		return true
 	}
@@ -183,7 +183,7 @@ func getNewMasterWorldview(masterWorldview MasterWorldview, slaveWorldview Slave
 		for buttonType := range masterMatrix[floor] {
 			if masterMatrix[floor][buttonType] == CallStateNone && slaveMatrix[floor][buttonType] == CallStateOrder {
 				masterMatrix[floor][buttonType] = CallStateOrder
-			} else if isCallAssignedToSlave(masterMatrix[floor][buttonType], elevatorCount) &&
+			} else if isCallAssigned(masterMatrix[floor][buttonType], elevatorCount) &&
 				slaveMatrix[floor][buttonType] == CallStateCompleted &&
 				masterMatrix[floor][buttonType] == CallState(slaveWorldview.NetworkID) {
 
@@ -220,7 +220,7 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 	for floor := range floorCount {
 		hallCallsMatrix[floor] = make([]bool, 2) // TODO: Maybe don't hardcode 2, but rather have a const for the number of hall button types
 		for buttonType := range 2 {              // TODO: Maybe don't hardcode 2, but rather have a const for the number of hall button types
-			if masterWorldview.Calls.Matrix[floor][buttonType] == CallStateOrder || isCallAssignedToSlave(masterWorldview.Calls.Matrix[floor][buttonType], elevatorCount) {
+			if masterWorldview.Calls.Matrix[floor][buttonType] == CallStateOrder || isCallAssigned(masterWorldview.Calls.Matrix[floor][buttonType], elevatorCount) {
 				hallCallsMatrix[floor][buttonType] = true
 			} else {
 				hallCallsMatrix[floor][buttonType] = false
@@ -240,7 +240,7 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 
 		for floor := range floorCount {
 			buttonType := 2 + slaveWorldview.NetworkID - 1 // TODO: Maybe not hardcode 2. Cab calls start after the hall calls in the button type indexing.
-			if masterWorldview.Calls.Matrix[floor][buttonType] == CallStateOrder || isCallAssignedToSlave(masterWorldview.Calls.Matrix[floor][buttonType], elevatorCount) {
+			if masterWorldview.Calls.Matrix[floor][buttonType] == CallStateOrder || isCallAssigned(masterWorldview.Calls.Matrix[floor][buttonType], elevatorCount) {
 				cabCalls[floor] = true
 			} else {
 				cabCalls[floor] = false
@@ -355,7 +355,7 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 	return masterWorldview
 }
 
-// TODO: This is reused from network_server.go
+// TODO: This is reused from network_server.go, slave.go
 func resetTimer(timer *time.Timer, duration time.Duration) {
 	if !timer.Stop() {
 		select {

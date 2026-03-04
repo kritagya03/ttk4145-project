@@ -1,10 +1,10 @@
 package models
 
-type Direction int
+// type ElevatorDirection int
 
 // Error because also implemented in types.go
 // const (
-// 	DirectionUp Direction = iota
+// 	DirectionUp ElevatorDirection = iota
 // 	DirectionDown
 // 	DirectionStop
 // )
@@ -43,13 +43,13 @@ type Obstruction struct {
 }
 
 type MotorDirection struct {
-	Direction Direction
+	Direction ElevatorDirection
 }
 
 type ButtonLamp struct {
 	CallType     CallType
 	Floor        int
-	shouldTurnOn bool
+	TurnOn bool
 }
 
 type FloorIndicator struct {
@@ -57,9 +57,9 @@ type FloorIndicator struct {
 }
 
 type DoorOpenLamp struct {
-	shouldTurnOn bool
+	TurnOn bool
 }
 
 type StopLamp struct {
-	shouldTurnOn bool
+	TurnOn bool
 }

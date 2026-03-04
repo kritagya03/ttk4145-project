@@ -64,7 +64,7 @@ func main() {
 		networkID,
 		elevatorCount)
 	go master.Server(masterNetworkEvents, masterNetworkCommands, networkID, floorCount, buttonTypeCount, elevatorCount)
-	go slave.Server(slaveNetworkEvents, slaveNetworkCommands)
+	go slave.Server(slaveNetworkEvents, slaveNetworkCommands, networkID, floorCount, buttonTypeCount)
 
 	fmt.Println("Finished setting up goroutines.")
 

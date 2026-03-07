@@ -18,11 +18,11 @@ const (
 )
 
 type HardwareEvent interface {
-	CallButton | FloorEnter | Stop | Obstruction
+	CallButton | FloorEnter | Stop | DoorObstruction | Initialization
 }
 
 type HardwareCommand interface {
-	MotorDirection | ButtonLamp | FloorIndicator | DoorOpenLamp | StopLamp
+	ElevatorDirection | ButtonLamp | FloorIndicator | DoorOpenLamp | StopLamp
 }
 
 type CallButton struct {
@@ -38,18 +38,22 @@ type Stop struct {
 	ToStop bool
 }
 
-type Obstruction struct {
+type DoorObstruction struct {
 	IsObstructed bool
 }
 
-type MotorDirection struct {
-	Direction ElevatorDirection
+type Initialization struct {
+	Floor int
 }
 
+// type MotorDirection struct {
+// 	Direction ElevatorDirection
+// }
+
 type ButtonLamp struct {
-	CallType     CallType
-	Floor        int
-	TurnOn bool
+	CallType CallType
+	Floor    int
+	TurnOn   bool
 }
 
 type FloorIndicator struct {

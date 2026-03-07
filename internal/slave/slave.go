@@ -7,6 +7,21 @@ import (
 	. "github.com/kritagya03/ttk4145-project/internal/models"
 )
 
+// 1. Implement initialization (e.g. initialize between floors)
+// 2. Implement marking call orders
+// 3. Implement marking call completed
+// 4. Implement arriving at floor
+// 5. Implement door timeout
+// 6. Implement checking if has requests above, here, below
+// 7. Implement choosing direction
+// 8. Implement if should stop
+// 9. Implement turning on and off lights
+// 10. Implement setting motor
+// 11. Implement setting floor indicator
+// 12. Implement acceptance tests
+// 13. Implement door obstruction
+// 14. Implement motor stuck
+
 func Server(
 	slaveNetworkEvents <-chan MasterWorldview,
 	slaveHardwareEvents <-chan interface{},
@@ -28,6 +43,7 @@ func Server(
 		select {
 		case masterEvent := <-slaveNetworkEvents:
 			fmt.Printf("slave.go case slaveNetworkEvents. Received MasterWorldview: %+v\n", masterEvent)
+			// ! Implement
 
 		case message := <-slaveHardwareEvents:
 			switch event := message.(type) {
@@ -35,20 +51,60 @@ func Server(
 				callButtonEvent := event
 				fmt.Println("Call button pressed:", event)
 				OnRequestButtonPress(callButtonEvent, &slaveWorldview, doorOpenTimeout, slaveHardwareCommands, networkID)
+
 			case FloorEnter:
 				fmt.Println("Floor entered:", event)
+				OnFloorArrival(event.Floor, &slaveWorldview, doorOpenTimeout, slaveHardwareCommands)
+
 			case Stop:
 				fmt.Println("Stop initiated:", event)
-			case Obstruction:
-				fmt.Println("Obstruction detected:", event)
+				for floor := range floorCount {
+					for callType := range CallType(3) {
+						slaveHardwareCommands <- ButtonLamp{
+							CallType: callType,
+							Floor:    floor,
+							TurnOn:   false,
+						}
+					}
+				}
+
+			case DoorObstruction:
+				elevator := slaveWorldview
+				fmt.Println("Door obstruction detected:", event)
+				// TODO: Implementation depends on specific requirements, often pauses the door timer
+				if event.IsObstructed && elevator.Behaviour == BehaviourDoorOpen {
+					slaveHardwareCommands <- DoorOpenLamp{TurnOn: true}
+					if !doorOpenTimeout.Stop() {
+						select {
+						case <-doorOpenTimeout.C:
+						default:
+						}
+					}
+				} else if !event.IsObstructed && elevator.Behaviour == BehaviourDoorOpen {
+					resetTimer(doorOpenTimeout, DoorOpenTimeoutDuration)
+				}
+
+			case Initialization:
+				fmt.Println("Initialization detected:", event)
+				if event.Floor == -1 {
+					fmt.Println("Elevator started between two floors.")
+					OnInitializeBetweenFloors(&slaveWorldview, slaveHardwareCommands)
+				} else {
+					fmt.Printf("Elevator started at a floor==%d\n", event.Floor)
+					slaveWorldview.FloorLastVisited = event.Floor
+				}
+
 			default:
-				fmt.Printf("Unknown event type: %T\n", event)
+				panic(fmt.Sprintf("Unknown event type: %T\n", event))
 			}
+
 		case <-heartbeatTicker.C:
 			fmt.Println("Slave heartbeat. Current SlaveWorldview:", slaveWorldview)
 			slaveNetworkCommands <- slaveWorldview
+
 		case <-doorOpenTimeout.C:
-			continue
+			fmt.Println("Door Open Timeout.")
+			OnDoorOpenTimeout(&slaveWorldview, doorOpenTimeout, slaveHardwareCommands)
 		}
 	}
 }
@@ -111,12 +167,12 @@ func OnRequestButtonPress(buttonEvent CallButton, elevator *SlaveWorldview, door
 	switch elevator.Behaviour {
 	case BehaviourDoorOpen:
 		if ShouldClearImmediately(*elevator, buttonEvent.Floor, buttonEvent.CallType) {
-			fmt.Println("OnRequestButtonPress - EB_DoorOpen - ShouldClearImmediately=true: Wanting to start the timer again.")
+			fmt.Println("OnRequestButtonPress - BehaviourDoorOpen - ShouldClearImmediately=true: Wanting to start the timer again.")
 			resetTimer(doorOpenTimeout, DoorOpenTimeoutDuration)
 		} else {
 			matrixIndex := callTypeToMatrixIndex(buttonEvent.CallType, networkID)
 			elevator.Calls.Matrix[buttonEvent.Floor][matrixIndex] = CallStateOrder
-			fmt.Println("OnRequestButtonPress - EB_DoorOpen - ShouldClearImmediately=false: Added order to e.Requests.")
+			fmt.Println("OnRequestButtonPress - BehaviourDoorOpen - ShouldClearImmediately=false: Added order to e.Requests.")
 		}
 
 	case BehaviourMoving:
@@ -127,24 +183,24 @@ func OnRequestButtonPress(buttonEvent CallButton, elevator *SlaveWorldview, door
 	case BehaviourIdle:
 		matrixIndex := callTypeToMatrixIndex(buttonEvent.CallType, networkID)
 		elevator.Calls.Matrix[buttonEvent.Floor][matrixIndex] = CallStateOrder
-		fmt.Println("OnRequestButtonPress - EB_Idle: Added order to e.Requests.")
-		directionBehaviourPair := ChooseDirection(*elevator)
+		fmt.Println("OnRequestButtonPress - BehaviourIdle: Added order to e.Requests.")
+		directionBehaviourPair := ChooseDirectionBehaviour(*elevator)
 		elevator.Direction = directionBehaviourPair.Direction
 		elevator.Behaviour = directionBehaviourPair.Behaviour
-		fmt.Println("OnRequestButtonPress - EB_Idle: Chosen new direction:", directionBehaviourPair)
+		fmt.Println("OnRequestButtonPress - BehaviourIdle: Chosen new direction:", directionBehaviourPair)
 
 		switch directionBehaviourPair.Behaviour {
 		case BehaviourDoorOpen:
 			slaveHardwareCommands <- DoorOpenLamp{TurnOn: true}
 			resetTimer(doorOpenTimeout, DoorOpenTimeoutDuration)
 			*elevator = ClearServedCallsAtCurrentFloor(*elevator)
-			fmt.Println("OnRequestButtonPress - EB_Idle - New behaviour is EB_DoorOpen: Opened door, wanting to start the timer, maybe remove order(s) at floor if possible.")
+			fmt.Println("OnRequestButtonPress - BehaviourIdle - New behaviour is BehaviourDoorOpen: Opened door, wanting to start the timer, maybe remove order(s) at floor if possible.")
 		case BehaviourMoving:
-			slaveHardwareCommands <- MotorDirection{Direction: elevator.Direction}
-			fmt.Println("OnRequestButtonPress - EB_Idle - New behaviour is EB_Moving: set the motor direction: ", e.Direction)
+			slaveHardwareCommands <- elevator.Direction
+			fmt.Println("OnRequestButtonPress - BehaviourIdle - New behaviour is EB_Moving: set the motor direction: ", elevator.Direction)
 		case BehaviourIdle:
 			// Do nothing
-			fmt.Println("OnRequestButtonPress - EB_Idle - New behaviour is EB_Idle: Doing nothing")
+			fmt.Println("OnRequestButtonPress - BehaviourIdle - New behaviour is BehaviourIdle: Doing nothing")
 		}
 	}
 
@@ -184,7 +240,7 @@ func OnInitializeBetweenFloors(elevator *SlaveWorldview, slaveHardwareCommands c
 	fmt.Println("OnInitializeBetweenFloors: wanting to move down.")
 	elevator.Direction = DirectionDown
 	elevator.Behaviour = BehaviourMoving
-	slaveHardwareCommands <- MotorDirection{Direction: DirectionDown}
+	slaveHardwareCommands <- DirectionDown
 
 }
 
@@ -198,9 +254,9 @@ func OnFloorArrival(newFloor int, elevator *SlaveWorldview, doorOpenTimeout *tim
 	slaveHardwareCommands <- FloorIndicator{Floor: newFloor}
 	switch elevator.Behaviour {
 	case BehaviourMoving:
-		if ShouldStop(elevator) {
+		if ShouldStop(*elevator) {
 			fmt.Println("OnFloorArrival - EB_Moving - elevator.ShouldStop()==True: wanting to stop, open door, maybe clear order(s) at floor, reset timer, update lights.")
-			slaveHardwareCommands <- MotorDirection{Direction: DirectionStop}
+			slaveHardwareCommands <- DirectionStop
 			slaveHardwareCommands <- DoorOpenLamp{TurnOn: true}
 			*elevator = ClearServedCallsAtCurrentFloor(*elevator)
 			resetTimer(doorOpenTimeout, DoorOpenTimeoutDuration)
@@ -217,33 +273,33 @@ func OnFloorArrival(newFloor int, elevator *SlaveWorldview, doorOpenTimeout *tim
 	// elevator.Print()
 }
 
-// OnDoorTimeout handles the door closing
-func OnDoorTimeout(elevator *SlaveWorldview, doorOpenTimeout *time.Timer, slaveHardwareCommands chan<- interface{}) {
-	fmt.Printf("\n\n%s()\n", "OnDoorTimeout")
+// OnDoorOpenTimeout handles the door closing
+func OnDoorOpenTimeout(elevator *SlaveWorldview, doorOpenTimeout *time.Timer, slaveHardwareCommands chan<- interface{}) {
+	fmt.Printf("\n\n%s()\n", "OnDoorOpenTimeout")
 	// elevator.Print()
 
 	switch elevator.Behaviour {
 	case BehaviourDoorOpen:
-		fmt.Println("OnDoorTimeout - EB_DoorOpen: choosing new direction.")
-		directionBehaviourPair := ChooseDirection(*elevator)
+		fmt.Println("OnDoorOpenTimeout - BehaviourDoorOpen: choosing new direction.")
+		directionBehaviourPair := ChooseDirectionBehaviour(*elevator)
 		elevator.Direction = directionBehaviourPair.Direction
 		elevator.Behaviour = directionBehaviourPair.Behaviour
 
 		switch elevator.Behaviour {
 		case BehaviourDoorOpen:
-			fmt.Println("OnDoorTimeout - EB_DoorOpen - new behaviour is EB_DoorOpen: wanting to reset timer, maybe clear order(s) at floor, updating lights.")
+			fmt.Println("OnDoorOpenTimeout - BehaviourDoorOpen - new behaviour is BehaviourDoorOpen: wanting to reset timer, maybe clear order(s) at floor, updating lights.")
 			resetTimer(doorOpenTimeout, DoorOpenTimeoutDuration)
 			*elevator = ClearServedCallsAtCurrentFloor(*elevator)
 			SetAllLights(*elevator, slaveHardwareCommands)
 		case BehaviourMoving, BehaviourIdle:
-			fmt.Printf("OnDoorTimeout - EB_DoorOpen - new behaviour is %v: opening door, setting direction %v.\n", elevator.Behaviour, elevator.Direction)
+			fmt.Printf("OnDoorOpenTimeout - BehaviourDoorOpen - new behaviour is %v: opening door, setting direction %v.\n", elevator.Behaviour, elevator.Direction)
 			slaveHardwareCommands <- DoorOpenLamp{TurnOn: false}
-			slaveHardwareCommands <- MotorDirection{Direction: elevator.Direction}
+			slaveHardwareCommands <- elevator.Direction
 		}
 
 	default:
 		// If initializing the elevator on a floor, this happens
-		fmt.Printf("OnDoorTimeout - elevator.Behaviour==default(%v): Doing nothing.\n", elevator.Behaviour)
+		fmt.Printf("OnDoorOpenTimeout - elevator.Behaviour==default(%v): Doing nothing.\n", elevator.Behaviour)
 		// Should not happen
 	}
 
@@ -289,62 +345,71 @@ func hasCallsHere(elevator SlaveWorldview) bool {
 
 // TODO: We are here. Continue below.
 
-// DirectionBehaviourPair is a return type for ChooseDirection
 type DirectionBehaviourPair struct {
-	Direction MotorDirection
+	Direction ElevatorDirection
 	Behaviour ElevatorBehaviour
 }
 
-// ChooseDirection implements requests_chooseDirection
-func ChooseDirection(elevator SlaveWorldview) DirectionBehaviourPair {
-	switch e.Direction {
-	case elevdriver.MD_Up:
-		if e.hasCallsAbove() {
-			return DirectionBehaviourPair{elevdriver.MD_Up, EB_Moving}
-		} else if e.hasCallsHere() {
-			return DirectionBehaviourPair{elevdriver.MD_Down, EB_DoorOpen} // Intention of going down because previous if statement verified that there are no requests above
-		} else if e.hasCallsBelow() {
-			return DirectionBehaviourPair{elevdriver.MD_Down, EB_Moving}
+func ChooseDirectionBehaviour(elevator SlaveWorldview) DirectionBehaviourPair {
+	switch elevator.Direction {
+	case DirectionUp:
+		if hasCallsAbove(elevator) {
+			return DirectionBehaviourPair{DirectionUp, BehaviourMoving}
+		} else if hasCallsHere(elevator) {
+			return DirectionBehaviourPair{DirectionDown, BehaviourDoorOpen} // Intention of going down because previous if statement verified that there are no requests above
+		} else if hasCallsBelow(elevator) {
+			return DirectionBehaviourPair{DirectionDown, BehaviourMoving}
 		} else {
-			return DirectionBehaviourPair{elevdriver.MD_Stop, EB_Idle}
+			return DirectionBehaviourPair{DirectionStop, BehaviourIdle}
 		}
-	case elevdriver.MD_Down:
-		if e.hasCallsBelow() {
-			return DirectionBehaviourPair{elevdriver.MD_Down, EB_Moving}
-		} else if e.hasCallsHere() {
-			return DirectionBehaviourPair{elevdriver.MD_Up, EB_DoorOpen} // Intention of going up because previous if statement verified that there are no requests below
-		} else if e.hasCallsAbove() {
-			return DirectionBehaviourPair{elevdriver.MD_Up, EB_Moving}
+	case DirectionDown:
+		if hasCallsBelow(elevator) {
+			return DirectionBehaviourPair{DirectionDown, BehaviourMoving}
+		} else if hasCallsHere(elevator) {
+			return DirectionBehaviourPair{DirectionUp, BehaviourDoorOpen} // Intention of going up because previous if statement verified that there are no requests below
+		} else if hasCallsAbove(elevator) {
+			return DirectionBehaviourPair{DirectionUp, BehaviourMoving}
 		} else {
-			return DirectionBehaviourPair{elevdriver.MD_Stop, EB_Idle}
+			return DirectionBehaviourPair{DirectionStop, BehaviourIdle}
 		}
-	case elevdriver.MD_Stop:
-		if e.hasCallsHere() {
-			return DirectionBehaviourPair{elevdriver.MD_Stop, EB_DoorOpen}
-		} else if e.hasCallsAbove() {
-			return DirectionBehaviourPair{elevdriver.MD_Up, EB_Moving}
-		} else if e.hasCallsBelow() {
-			return DirectionBehaviourPair{elevdriver.MD_Down, EB_Moving}
+	case DirectionStop:
+		if hasCallsHere(elevator) {
+			return DirectionBehaviourPair{DirectionStop, BehaviourDoorOpen}
+		} else if hasCallsAbove(elevator) {
+			return DirectionBehaviourPair{DirectionUp, BehaviourMoving}
+		} else if hasCallsBelow(elevator) {
+			return DirectionBehaviourPair{DirectionDown, BehaviourMoving}
 		} else {
-			return DirectionBehaviourPair{elevdriver.MD_Stop, EB_Idle}
+			return DirectionBehaviourPair{DirectionStop, BehaviourIdle}
 		}
 	default:
-		return DirectionBehaviourPair{elevdriver.MD_Stop, EB_Idle}
+		return DirectionBehaviourPair{DirectionStop, BehaviourIdle}
 	}
 }
 
+func isCallAssignedToElevator(callState CallState, networkID int) bool {
+	if int(callState) == networkID {
+		return true
+	}
+	return false
+}
+
 // ShouldStop implements requests_shouldStop
-func (e Elevator) ShouldStop() bool {
-	switch e.Direction {
-	case elevdriver.MD_Down:
-		return e.Requests[e.Floor][elevdriver.BT_HallDown] ||
-			e.Requests[e.Floor][elevdriver.BT_Cab] ||
-			!e.hasCallsBelow()
-	case elevdriver.MD_Up:
-		return e.Requests[e.Floor][elevdriver.BT_HallUp] ||
-			e.Requests[e.Floor][elevdriver.BT_Cab] ||
-			!e.hasCallsAbove()
-	case elevdriver.MD_Stop:
+func ShouldStop(elevator SlaveWorldview) bool {
+	callHallDownIndex := callTypeToMatrixIndex(CallHallDown, elevator.NetworkID)
+	callHallUpIndex := callTypeToMatrixIndex(CallHallUp, elevator.NetworkID)
+	callCabIndex := callTypeToMatrixIndex(CallCab, elevator.NetworkID)
+
+	switch elevator.Direction {
+	case DirectionDown:
+		return isCallAssignedToElevator(elevator.Calls.Matrix[elevator.FloorLastVisited][callHallDownIndex], elevator.NetworkID) ||
+			isCallAssignedToElevator(elevator.Calls.Matrix[elevator.FloorLastVisited][callCabIndex], elevator.NetworkID) ||
+			!hasCallsBelow(elevator)
+	case DirectionUp:
+		return isCallAssignedToElevator(elevator.Calls.Matrix[elevator.FloorLastVisited][callHallUpIndex], elevator.NetworkID) ||
+			isCallAssignedToElevator(elevator.Calls.Matrix[elevator.FloorLastVisited][callCabIndex], elevator.NetworkID) ||
+			!hasCallsAbove(elevator)
+	case DirectionStop:
 		fallthrough
 	default:
 		return true
@@ -352,50 +417,35 @@ func (e Elevator) ShouldStop() bool {
 }
 
 // ShouldClearImmediately implements requests_shouldClearImmediately
-func ShouldClearImmediately(elevator SlaveWorldview, btnFloor int, btnType elevdriver.ButtonType) bool {
-	return e.Floor == btnFloor &&
-		((e.Direction == elevdriver.MD_Up && btnType == elevdriver.BT_HallUp) ||
-			(e.Direction == elevdriver.MD_Down && btnType == elevdriver.BT_HallDown) ||
-			e.Direction == elevdriver.MD_Stop ||
-			btnType == elevdriver.BT_Cab)
+func ShouldClearImmediately(elevator SlaveWorldview, buttonFloor int, buttonCallType CallType) bool {
+	return elevator.FloorLastVisited == buttonFloor &&
+		((elevator.Direction == DirectionUp && buttonCallType == CallHallUp) ||
+			(elevator.Direction == DirectionDown && buttonCallType == CallHallDown) ||
+			elevator.Direction == DirectionStop ||
+			buttonCallType == CallCab)
 }
 
 // ClearServedCallsAtCurrentFloor implements requests_clearAtCurrentFloor
 // This modifies the elevator state in place.
 func ClearServedCallsAtCurrentFloor(elevator SlaveWorldview) SlaveWorldview {
-	elevator.Requests[elevator.Floor][elevdriver.BT_Cab] = false
+	elevator.Calls.Matrix[elevator.FloorLastVisited][CallCab] = CallStateCompleted
 
 	switch elevator.Direction {
-	case elevdriver.MD_Up:
-		if !hasCallsAbove(elevator) && !elevator.Requests[elevator.Floor][elevdriver.BT_HallUp] {
-			elevator.Requests[elevator.Floor][elevdriver.BT_HallDown] = false // No one wants to go up, therefore if call down, it can be cleared because it will immediatly be server
+	case DirectionUp:
+		if !hasCallsAbove(elevator) && !isCallAssignedToElevator(elevator.Calls.Matrix[elevator.FloorLastVisited][CallHallUp], elevator.NetworkID) {
+			elevator.Calls.Matrix[elevator.FloorLastVisited][CallHallDown] = CallStateCompleted // No one wants to go up, therefore if call down, it can be cleared because it will immediatly be server
 		}
-		elevator.Requests[elevator.Floor][elevdriver.BT_HallUp] = false
-	case elevdriver.MD_Down:
-		if !hasCallsBelow(elevator) && !elevator.Requests[elevator.Floor][elevdriver.BT_HallDown] {
-			elevator.Requests[elevator.Floor][elevdriver.BT_HallUp] = false
+		elevator.Calls.Matrix[elevator.FloorLastVisited][CallHallUp] = CallStateCompleted
+	case DirectionDown:
+		if !hasCallsBelow(elevator) && !isCallAssignedToElevator(elevator.Calls.Matrix[elevator.FloorLastVisited][CallHallDown], elevator.NetworkID) {
+			elevator.Calls.Matrix[elevator.FloorLastVisited][CallHallUp] = CallStateCompleted
 		}
-		elevator.Requests[elevator.Floor][elevdriver.BT_HallDown] = false
-	case elevdriver.MD_Stop:
+		elevator.Calls.Matrix[elevator.FloorLastVisited][CallHallDown] = CallStateCompleted
+	case DirectionStop:
 		fallthrough
 	default:
-		elevator.Requests[elevator.Floor][elevdriver.BT_HallUp] = false
-		elevator.Requests[elevator.Floor][elevdriver.BT_HallDown] = false
+		elevator.Calls.Matrix[elevator.FloorLastVisited][CallHallUp] = CallStateCompleted
+		elevator.Calls.Matrix[elevator.FloorLastVisited][CallHallDown] = CallStateCompleted
 	}
 	return elevator
 }
-
-// 1. Implement initialization (e.g. initialize between floors)
-// 2. Implement marking call orders
-// 3. Implement marking call completed
-// 4. Implement arriving at floor
-// 5. Implement door timeout
-// 6. Implement checking if has requests above, here, below
-// 7. Implement choosing direction
-// 8. Implement if should stop
-// 9. Implement turning on and off lights
-// 10. Implement setting motor
-// 11. Implement setting floor indicator
-// 12. Implement acceptance tests
-// 13. Implement door obstruction
-// 14. Implement motor stuck

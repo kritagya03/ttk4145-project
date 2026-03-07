@@ -16,28 +16,28 @@ Master:
     - Don't pass floorcount, elevatorcount and buttontypes. Use matrix dimentions
 
 Slave:
-1. Implement initialization (e.g. initialize between floors)
-2. Implement marking call orders
-3. Implement marking call completed
-4. Implement arriving at floor
-5. Implement door timeout
-6. Implement checking if has requests above, here, below
-7. Implement choosing direction
-8. Implement if should stop
-9. Implement turning on and off lights
-10. Implement setting motor
-11. Implement setting floor indicator
-12. Implement acceptance tests
-13. Implement door obstruction
-14. Implement motor stuck
+1. Implement initialization (e.g. initialize between floors)-
+2. Implement marking call orders-
+3. Implement marking call completed-
+4. Implement arriving at floor-
+5. Implement door open timeout-
+6. Implement checking if has requests above, here, below-
+7. Implement choosing direction-
+8. Implement if should stop-
+9. Implement turning on and off lights-
+10. Implement setting motor-
+11. Implement setting floor indicator-
+12. Implement door obstruction-
+13. Implement acceptance tests
+14. Implement motor stuck (acceptance test)
 
 Watchdog:
 1. make a process pair instead
 
 Hardware:
-1. Implement reciever
+1. Implement reciever (maybe not currently working)
 2. Implement transmitter
-3. Implement server
+3. Implement server (maybe not currently working)
 
 Models:
 1. Set correct durations for all the Time.Duration

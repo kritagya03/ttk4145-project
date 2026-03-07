@@ -52,6 +52,8 @@ func main() {
 	broadcastCommands := make(chan []byte, channelBufferSize)
 	masterNetworkEvents := make(chan interface{}, channelBufferSize)
 	slaveNetworkEvents := make(chan MasterWorldview, channelBufferSize)
+	slaveHardwareEvents := make(chan interface{}, channelBufferSize)
+	slaveHardwareCommands := make(chan interface{}, channelBufferSize)
 
 	go network.Transmitter(broadcastCommands, networkPort)
 	go network.Receiver(broadcastEvents, networkPort)
@@ -64,7 +66,7 @@ func main() {
 		networkID,
 		elevatorCount)
 	go master.Server(masterNetworkEvents, masterNetworkCommands, networkID, floorCount, buttonTypeCount, elevatorCount)
-	go slave.Server(slaveNetworkEvents, slaveNetworkCommands, networkID, floorCount, buttonTypeCount)
+	go slave.Server(slaveNetworkEvents, slaveHardwareEvents, slaveNetworkCommands, slaveHardwareCommands, networkID, floorCount, buttonTypeCount)
 
 	fmt.Println("Finished setting up goroutines.")
 

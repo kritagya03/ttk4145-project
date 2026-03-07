@@ -12,6 +12,10 @@ func Server[hardwareEventType HardwareEvent, hardwareCommandType HardwareCommand
 	hardwareCommands chan<- []byte,
 	slaveHardwareEvents chan<- hardwareEventType) {
 
+	// elevdriver.Initialize("localhost:15657", floorCount)
+
+	// On startup send the current floor to slave.go such that it can initialize (maybe inbetween floors). Send Initialization{Floor: XXX} first to slave.go
+
 	for {
 		select {
 		case hardwareEvent := <-hardwareEvents:

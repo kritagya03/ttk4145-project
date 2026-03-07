@@ -1,9 +1,29 @@
 package hardware
 
-// A lot of common code with network_transmitter.go
-// Make good quality code in network_transmitter.go before using it as a reference.
-func Transmitter(hardwareCommands <-chan []byte, address string) {
-	// Setup connection
+import (
+	"fmt"
+	"net"
+)
 
-	// Foor loop of reading packet from hardwareCommands channel and writing the packet to the connection
+func Transmitter(hardwareCommands <-chan []byte, destinationAddress string) {
+	tcpAddress, errorResolve := net.ResolveTCPAddr("tcp", destinationAddress)
+	if errorResolve != nil {
+		panic(fmt.Sprintf("Error resolving TCP Address: %v", errorResolve))
+	}
+
+	transmitConnection, errorDial := net.DialTCP("tcp", nil, tcpAddress)
+	if errorDial != nil {
+		panic(fmt.Sprintf("Error dialing: %v", errorDial))
+	}
+	defer transmitConnection.Close()
+
+	for {
+		packetBuffer := <-hardwareCommands
+		_, errorSending := transmitConnection.Write(packetBuffer)
+		if errorSending != nil {
+			panic(fmt.Sprintf("Error sending: %v", errorSending))
+		}
+	}
 }
+
+

@@ -36,8 +36,8 @@ Watchdog:
 
 Hardware:
 1. Implement reciever (maybe not currently working)
-2. Implement transmitter
-3. Implement server (maybe not currently working)
+2. Implement transmitter (maybe not currently working)
+3. Implement server
 
 Models:
 1. Set correct durations for all the Time.Duration

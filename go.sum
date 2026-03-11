@@ -1,2 +1,4 @@
+github.com/TTK4145/driver-go v0.0.0-20220405133125-4ed22a52a81b h1:3z+KlSSw2emt+UcmUcZtuuYhAk5PULABaMFTTjwWd5U=
+github.com/TTK4145/driver-go v0.0.0-20220405133125-4ed22a52a81b/go.mod h1:Labu6N/KQZC3S/rqB5jfKHYwX7dPpbos3YQ+3L36+nM=
 github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf h1:iW4rZ826su+pqaw19uhpSCzhj44qo35pNgKFGqzDKkU=
 github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf/go.mod h1:F5haX7vjVVG0kc13fIWeqUViNPyEJxv/OmvnBo0Yme4=

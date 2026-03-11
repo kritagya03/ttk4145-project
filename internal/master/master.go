@@ -1,6 +1,7 @@
 package master
 
 import (
+	"Driver-go/elevio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -13,20 +14,20 @@ import (
 	. "github.com/kritagya03/ttk4145-project/internal/models"
 )
 
-type MasterState int
+type masterState int
 
 const (
-	MasterInactive MasterState = iota
-	MasterCandidate
-	MasterActive
-	MasterMerging // TODO: maybe change name because also merging master worldviews if not in this state
+	masterInactive masterState = iota
+	masterCandidate
+	masterActive
+	masterMerging // TODO: maybe change name because also merging master worldviews if not in this state
 )
 
 // TODO: Make the state machine more beautiful (good code quality, keep events on the outside and state on the inside)
 
 func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<- MasterWorldview, networkID int, floorCount int, buttonTypeCount int, elevatorCount int) {
 	masterWorldview := getDefaultMasterWorldview(networkID, floorCount, buttonTypeCount)
-	masterState := MasterCandidate
+	masterState := masterCandidate
 
 	slaveWorldviewList := make([]SlaveWorldview, elevatorCount) // TODO: maybe change variable name
 	slaveOnlineList := make([]bool, elevatorCount)              // TODO: maybe change variable name
@@ -58,7 +59,7 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 			case SlaveWorldview:
 				slaveWorldview := event
 				fmt.Printf("master.go case masterNetworkEvents. Received SlaveWorldview: %v\n", slaveWorldview)
-				if masterState == MasterActive {
+				if masterState == masterActive {
 					slaveWorldviewList[slaveWorldview.NetworkID-1] = slaveWorldview
 					masterWorldview = getNewMasterWorldview(masterWorldview, slaveWorldview, slaveWorldviewList, slaveOnlineList)
 				}
@@ -71,17 +72,17 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 			case NewMasterConnection:
 				fmt.Printf("master.go case masterNetworkEvents. Received New Master Connection: %d\n", event)
 				switch masterState {
-				case MasterCandidate:
+				case masterCandidate:
 					fmt.Println("master.go case masterNetworkEvents. Received New Master Connection while in Candidate state.")
-					masterState = MasterInactive
-				case MasterActive:
+					masterState = masterInactive
+				case masterActive:
 					fmt.Println("master.go case masterNetworkEvents. Received New Master Connection while in Active state.")
-					masterState = MasterMerging
+					masterState = masterMerging
 					resetTimer(mergingMastersTimeout, MergingMastersTimeoutDuration)
-				case MasterMerging:
+				case masterMerging:
 					fmt.Println("master.go case masterNetworkEvents. Received New Master Connection while in Merging state")
 					resetTimer(mergingMastersTimeout, MergingMastersTimeoutDuration)
-				case MasterInactive:
+				case masterInactive:
 					fmt.Println("master.go case masterNetworkEvents. Received New Master Connection while in Inactive state")
 				default:
 					panic(fmt.Sprintf("master.go case masterNetworkEvents. Received unknown event type: %T, value: %v", event, event))
@@ -94,8 +95,8 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 
 			case MasterTimeout:
 				fmt.Println("master.go case masterNetworkEvents. Received Master Timeout.")
-				if masterState != MasterActive {
-					masterState = MasterCandidate
+				if masterState != masterActive {
+					masterState = masterCandidate
 					resetTimer(electionTimeout, BaseElectionTimeout*time.Duration(networkID)) // TODO: Currently resetting this timer in two locations, maybe only need to reset in one location.
 				}
 
@@ -108,19 +109,19 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 				panic(fmt.Sprintf("master.go case masterNetworkEvents. Unknown type: %T\n", event))
 			}
 		case <-heartbeatTicker.C:
-			if masterState == MasterActive || masterState == MasterMerging {
+			if masterState == masterActive || masterState == masterMerging {
 				fmt.Println("Master heartbeat. Current MasterWorldview:", masterWorldview)
 				masterNetworkCommands <- masterWorldview
 			}
 		case <-electionTimeout.C:
-			if masterState == MasterCandidate {
-				fmt.Println("Election timeout. Transitioning to MasterActive state.")
-				masterState = MasterActive
+			if masterState == masterCandidate {
+				fmt.Println("Election timeout. Transitioning to masterActive state.")
+				masterState = masterActive
 			}
 		case <-mergingMastersTimeout.C:
-			if masterState == MasterMerging {
-				fmt.Println("Merging Masters timeout. Transitioning to MasterCandidate state.")
-				masterState = MasterCandidate
+			if masterState == masterMerging {
+				fmt.Println("Merging Masters timeout. Transitioning to masterCandidate state.")
+				masterState = masterCandidate
 				resetTimer(electionTimeout, BaseElectionTimeout*time.Duration(networkID)) // TODO: Currently resetting this timer in two locations, maybe only need to reset in one location.
 			}
 		}
@@ -162,7 +163,7 @@ func getDefaultSlaveWorldview(networkID int) SlaveWorldview {
 	return SlaveWorldview{
 		NetworkID:        networkID,
 		FloorLastVisited: -1,
-		Direction:        DirectionStop,
+		Direction:        elevio.MD_Stop,
 		Behaviour:        BehaviourIdle,
 	}
 }
@@ -196,21 +197,19 @@ func getNewMasterWorldview(masterWorldview MasterWorldview, slaveWorldview Slave
 	return masterWorldview
 }
 
-type HallCallAssignerInput struct {
+type hallCallAssignerInput struct {
 	HallCalls      [][]bool                                 `json:"hallRequests"`
-	ElevatorStates map[string]HallCallAssignerElevatorState `json:"states"`
+	ElevatorStates map[string]hallCallAssignerElevatorState `json:"states"`
 }
 
-type HallCallAssignerElevatorState struct {
+type hallCallAssignerElevatorState struct {
 	Behaviour        string `json:"behaviour"`
 	FloorLastVisited int    `json:"floor"`
 	Direction        string `json:"direction"`
 	CabCalls         []bool `json:"cabRequests"`
 }
 
-type HallCallAssignerOutput map[string][][]bool
-
-// WE ARE HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+type hallCallAssignerOutput map[string][][]bool
 
 func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorldview, slaveOnlineList []bool) MasterWorldview {
 	floorCount := len(masterWorldview.Calls.Matrix)
@@ -230,7 +229,7 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 
 	fmt.Println("Hall calls matrix prepared for HCA input:", hallCallsMatrix)
 
-	elevatorStatesMap := make(map[string]HallCallAssignerElevatorState)
+	elevatorStatesMap := make(map[string]hallCallAssignerElevatorState)
 	for _, slaveWorldview := range slaveWorldviewList {
 		if slaveOnlineList[slaveWorldview.NetworkID-1] == false {
 			continue
@@ -252,15 +251,15 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 			BehaviourMoving:   "moving",
 			BehaviourDoorOpen: "doorOpen",
 		}
-		directionTextMapping := map[ElevatorDirection]string{
-			DirectionUp:   "up",
-			DirectionDown: "down",
-			DirectionStop: "stop",
+		directionTextMapping := map[elevio.MotorDirection]string{
+			elevio.MD_Up:   "up",
+			elevio.MD_Down: "down",
+			elevio.MD_Stop: "stop",
 		}
 
 		elevatorID := fmt.Sprintf("%d", slaveWorldview.NetworkID)
 
-		elevatorStatesMap[elevatorID] = HallCallAssignerElevatorState{
+		elevatorStatesMap[elevatorID] = hallCallAssignerElevatorState{
 			Behaviour:        behaviourTextMapping[slaveWorldview.Behaviour],
 			FloorLastVisited: slaveWorldview.FloorLastVisited,
 			Direction:        directionTextMapping[slaveWorldview.Direction],
@@ -275,7 +274,7 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 
 	fmt.Println("Elevator states map prepared for HCA input:", elevatorStatesMap)
 
-	input := HallCallAssignerInput{
+	input := hallCallAssignerInput{
 		HallCalls:      hallCallsMatrix,
 		ElevatorStates: elevatorStatesMap,
 	}
@@ -318,7 +317,7 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 	// /home/student/Desktop/KrittErKuL/ttk4145-project/bin/hall_call_assigner --input '{"hallRequests":[[false,true],[false,false],[false,false],[true,false]],"states":{"elevator0":{"behaviour":"idle","floor":1,"direction":"down","cabRequests":[false,true,false,false]},"elevator1":{"behaviour":"idle","floor":3,"direction":"up","cabRequests":[true,false,false,false]}}}'
 
 	// Parse output JSON
-	var output HallCallAssignerOutput
+	var output hallCallAssignerOutput
 	if errorJSONDecoring := json.Unmarshal(stdout.Bytes(), &output); errorJSONDecoring != nil {
 		panic(fmt.Sprintf("Failed to parse hall call assigner output: %v", errorJSONDecoring))
 	}

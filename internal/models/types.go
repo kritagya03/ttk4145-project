@@ -1,6 +1,9 @@
 package models
 
-import "fmt"
+import (
+	"Driver-go/elevio"
+	"fmt"
+)
 
 type ElevatorBehaviour int
 
@@ -10,13 +13,13 @@ const (
 	BehaviourMoving
 )
 
-type ElevatorDirection int
+// type ElevatorDirection int
 
-const (
-	DirectionUp ElevatorDirection = iota
-	DirectionDown
-	DirectionStop
-)
+// const (
+// 	DirectionUp ElevatorDirection = iota
+// 	DirectionDown
+// 	DirectionStop
+// )
 
 type CallState int
 
@@ -51,7 +54,7 @@ type MasterWorldview struct {
 type SlaveWorldview struct {
 	NetworkID        int
 	Behaviour        ElevatorBehaviour
-	Direction        ElevatorDirection
+	Direction        elevio.MotorDirection
 	FloorLastVisited int
 	Calls            CallsMatrix
 }

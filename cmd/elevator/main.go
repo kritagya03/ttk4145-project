@@ -1,6 +1,7 @@
 package main
 
 import (
+	"Driver-go/elevio"
 	"fmt"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 // }
 
 func main() {
+	// elevio.Init("localhost:15657", 4)
 	// networkPort := getEnvInt("NETWORK_PORT")
 	// floorCount := getEnvInt("FLOOR_COUNT")
 	// elevatorCount := getEnvInt("ELEVATOR_COUNT")
@@ -52,8 +54,6 @@ func main() {
 	broadcastCommands := make(chan []byte, channelBufferSize)
 	masterNetworkEvents := make(chan interface{}, channelBufferSize)
 	slaveNetworkEvents := make(chan MasterWorldview, channelBufferSize)
-	slaveHardwareEvents := make(chan interface{}, channelBufferSize)
-	slaveHardwareCommands := make(chan interface{}, channelBufferSize)
 
 	go network.Transmitter(broadcastCommands, networkPort)
 	go network.Receiver(broadcastEvents, networkPort)
@@ -66,7 +66,7 @@ func main() {
 		networkID,
 		elevatorCount)
 	go master.Server(masterNetworkEvents, masterNetworkCommands, networkID, floorCount, buttonTypeCount, elevatorCount)
-	go slave.Server(slaveNetworkEvents, slaveHardwareEvents, slaveNetworkCommands, slaveHardwareCommands, networkID, floorCount, buttonTypeCount)
+	go slave.Server(slaveNetworkEvents, slaveNetworkCommands, networkID, floorCount, buttonTypeCount)
 
 	fmt.Println("Finished setting up goroutines.")
 
@@ -74,33 +74,30 @@ func main() {
 	// 	time.Sleep(time.Second)
 	// 	testSendWorldview(networkID, floorCount, buttonTypeCount, elevatorCount, masterNetworkCommands, slaveNetworkCommands)
 	// }
-	testSendSlaveWorldview(networkID, floorCount, buttonTypeCount, elevatorCount, masterNetworkCommands, slaveNetworkCommands)
-	// time.Sleep(2 * time.Second)
-	masterWorldview := testGetDefaultMasterWorldview(networkID, floorCount, buttonTypeCount)
-	masterWorldview.Calls.Matrix[3][1] = 1
-	masterWorldview.Calls.Matrix[2][3] = 1
-	masterWorldview.Calls.Matrix[3][4] = 3
-	testSendMasterWorldview(masterWorldview, masterNetworkCommands)
-	masterWorldview.Calls.Matrix[1][1] = CallStateOrder
-	masterWorldview.Calls.Matrix[2][0] = CallStateOrder
-	testSendMasterWorldview(masterWorldview, masterNetworkCommands)
-	time.Sleep(2 * time.Second)
+	// testSendSlaveWorldview(networkID, floorCount, buttonTypeCount, elevatorCount, masterNetworkCommands, slaveNetworkCommands)
+	// // time.Sleep(2 * time.Second)
+	// masterWorldview := testGetDefaultMasterWorldview(networkID, floorCount, buttonTypeCount)
+	// masterWorldview.Calls.Matrix[3][1] = 1
+	// masterWorldview.Calls.Matrix[2][3] = 1
+	// masterWorldview.Calls.Matrix[3][4] = 3
+	// testSendMasterWorldview(masterWorldview, masterNetworkCommands)
+	// masterWorldview.Calls.Matrix[1][1] = CallStateOrder
+	// masterWorldview.Calls.Matrix[2][0] = CallStateOrder
+	// testSendMasterWorldview(masterWorldview, masterNetworkCommands)
+
+	time.Sleep(time.Hour) // ! TODO: CHANGE TO WAIT FOR SOMETHING
 }
 
 func testSendSlaveWorldview(networkID int, floorCount int, buttonTypeCount int, elevatorCount int, masterNetworkCommands chan<- MasterWorldview, slaveNetworkCommands chan<- SlaveWorldview) {
-	behaviour := BehaviourIdle
-	direction := DirectionStop
-	floorLastVisited := 0
-
 	callsSlave := make([][]CallState, floorCount)
 	for i := range callsSlave {
 		callsSlave[i] = make([]CallState, buttonTypeCount)
 	}
 	slaveWorld := SlaveWorldview{
 		NetworkID:        networkID,
-		Behaviour:        behaviour,
-		Direction:        direction,
-		FloorLastVisited: floorLastVisited,
+		Behaviour:        BehaviourIdle,
+		Direction:        elevio.MD_Stop,
+		FloorLastVisited: 0,
 		Calls:            CallsMatrix{Matrix: callsSlave},
 	}
 	slaveNetworkCommands <- slaveWorld

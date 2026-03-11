@@ -9,3 +9,4 @@ const HeartbeatTimeout time.Duration = HeartbeatInterval * time.Duration(100)
 const BaseElectionTimeout time.Duration = 15 * time.Millisecond
 const MergingMastersTimeoutDuration time.Duration = HeartbeatInterval * time.Duration(100)
 const DoorOpenTimeoutDuration time.Duration = time.Duration(time.Second * 3) // TODO: change
+const HardwarePollInterval time.Duration = time.Millisecond * 20

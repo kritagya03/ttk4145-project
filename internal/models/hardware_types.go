@@ -9,61 +9,57 @@ package models
 // 	DirectionStop
 // )
 
-type CallType int
+// type CallType int
 
-const (
-	CallHallUp CallType = iota
-	CallHallDown
-	CallCab
-)
+// const (
+// 	CallHallUp CallType = iota
+// 	CallHallDown
+// 	CallCab
+// )
 
-type HardwareEvent interface {
-	CallButton | FloorEnter | Stop | DoorObstruction | Initialization
-}
-
-type HardwareCommand interface {
-	ElevatorDirection | ButtonLamp | FloorIndicator | DoorOpenLamp | StopLamp
-}
-
-type CallButton struct {
-	Floor    int
-	CallType CallType
-}
-
-type FloorEnter struct {
-	Floor int
-}
-
-type Stop struct {
-	ToStop bool
-}
-
-type DoorObstruction struct {
-	IsObstructed bool
-}
-
-type Initialization struct {
-	Floor int
-}
-
-// type MotorDirection struct {
-// 	Direction ElevatorDirection
+// type HardwareEvent interface {
+// 	CallButton | FloorEnter | Stop | DoorObstruction | Initialization
 // }
 
-type ButtonLamp struct {
-	CallType CallType
-	Floor    int
-	TurnOn   bool
-}
+// type HardwareCommand interface {
+// 	ElevatorDirection | ButtonLamp | FloorIndicator | DoorOpenLamp | StopLamp
+// }
 
-type FloorIndicator struct {
-	Floor int
-}
+// type CallButton struct {
+// 	Floor    int
+// 	CallType CallType
+// }
 
-type DoorOpenLamp struct {
-	TurnOn bool
-}
+// type FloorEnter struct {
+// 	Floor int
+// }
 
-type StopLamp struct {
-	TurnOn bool
-}
+// type Stop struct {
+// 	ToStop bool
+// }
+
+// type DoorObstruction struct {
+// 	IsObstructed bool
+// }
+
+// type Initialization struct {
+// 	Floor int
+// }
+
+// type ButtonLamp struct {
+// 	CallType CallType
+// 	Floor    int
+// 	TurnOn   bool
+// }
+
+// type FloorIndicator struct {
+// 	Floor int
+// }
+
+// type DoorOpenLamp struct {
+// 	TurnOn bool
+// }
+
+// type StopLamp struct {
+// 	TurnOn bool
+// }

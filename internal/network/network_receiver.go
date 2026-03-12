@@ -3,6 +3,7 @@ package network
 import (
 	"fmt"
 	"net"
+
 	. "github.com/kritagya03/ttk4145-project/internal/models"
 )
 

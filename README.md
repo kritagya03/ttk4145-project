@@ -2,6 +2,16 @@
 
 TTK4145 elevator project at NTNU, made with Joachim Frydenlund and Henrik Markestad :)
 
+## How to run
+
+```sh
+git clone https://github.com/kritagya03/ttk4145-project.git
+cd ./ttk4145-project/cmd/elevator
+go run ./main.go -network-id 1 -hardware-port 16001
+```
+
+Or install the project through go
+
 ## TODO
 
 Master:
@@ -46,6 +56,8 @@ Models:
 
 Better code quality for importing models
 
+Maybe switch from printing to logging.
+
 Fault Tolerance:
 process pairs
 go through specs
@@ -53,7 +65,13 @@ acceptance tests
 
 
 
+
 Current errors:
-call on same floor activates ALL lights on that floor (hallup. halldown, cab)
- -> Removed Completed as a reason to keep the lights on at setAllLights
- -> || callState == CallStateCompleted
+ Poll rate in 10ms, heartbeat is 5 ??
+* when master dies most of the slaves die (but one might become the new master on rare occasions)
+* When any elevator adds a hall call on the same floor as a elevator, that elevator also turns on its cab call light on that floor
+
+
+ Possible huge erros:
+ * We are passing [][]CallState slices around believing we get deep copies, but a slice is maybe represented as a pointer such that we get shallow copies. We might need to implement a deep copy function for [][]CallState. Since SlaveWorldview and MasterWorldview uses [][]CallState we might need to implement a deep copy for both worldviews too.
+

@@ -7,9 +7,13 @@
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}/cmd/elevator",
-            // "env": {
-            //     "ELEVATOR_ID": "1"
-            // }
+            "args": [
+                "-network-id", "1",
+                // "-floor-count", "4",
+                // "-elevator-count", "3",
+                // "-network-port", "30045",
+                // "-hardware-port", "15657"
+            ]
         }
     ]
 }

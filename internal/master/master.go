@@ -59,8 +59,8 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 			case SlaveWorldview:
 				slaveWorldview := event
 				fmt.Printf("master.go case masterNetworkEvents. Received SlaveWorldview: %v\n", slaveWorldview)
+				slaveWorldviewList[slaveWorldview.NetworkID-1] = slaveWorldview
 				if masterState == masterActive {
-					slaveWorldviewList[slaveWorldview.NetworkID-1] = slaveWorldview
 					masterWorldview = getNewMasterWorldview(masterWorldview, slaveWorldview, slaveWorldviewList, slaveOnlineList)
 				}
 
@@ -168,6 +168,7 @@ func getDefaultSlaveWorldview(networkID int) SlaveWorldview {
 	}
 }
 
+// TODO: also used in slave.go
 func isCallAssigned(callState CallState, elevatorCount int) bool {
 	if int(callState) > 0 && int(callState) <= elevatorCount {
 		return true
@@ -231,6 +232,7 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 
 	elevatorStatesMap := make(map[string]hallCallAssignerElevatorState)
 	for _, slaveWorldview := range slaveWorldviewList {
+		// || slaveWorldview.FloorLastVisited < 0 || slaveWorldview.FloorLastVisited >= floorCount  // for fixing weird bug
 		if slaveOnlineList[slaveWorldview.NetworkID-1] == false {
 			continue
 		}

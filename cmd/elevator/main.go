@@ -2,7 +2,9 @@ package main
 
 import (
 	"Driver-go/elevio"
+	"flag"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/kritagya03/ttk4145-project/internal/master"
@@ -11,62 +13,62 @@ import (
 	"github.com/kritagya03/ttk4145-project/internal/slave"
 )
 
-// func getEnvInt(key string) int {
-// 	valueStr := os.Getenv(key)
-// 	value, err := strconv.Atoi(valueStr)
-// 	if err != nil {
-// 		log.Fatalf("Invalid value for %s: %v", key, err)
-// 	}
-// 	return value
-// }
+func areFlagsValid(networkID int, floorCount int, elevatorCount int, networkPort int, hardwarePort int) bool {
+	return networkID >= 1 &&
+		floorCount >= 1 &&
+		elevatorCount >= 1 &&
+		networkPort >= 1024 && networkPort <= 65535 &&
+		hardwarePort >= 1024 && hardwarePort <= 65535
+}
 
 func main() {
-	// elevio.Init("localhost:15657", 4)
-	// networkPort := getEnvInt("NETWORK_PORT")
-	// floorCount := getEnvInt("FLOOR_COUNT")
-	// elevatorCount := getEnvInt("ELEVATOR_COUNT")
-	// networkID := getEnvInt("NETWORK_ID")
-	// buttonTypeCount := 2 + elevatorCount
-	// calls := make([][]tmp.CallState, floorCount)
-	// for i := range calls {
-	// 	calls[i] = make([]tmp.CallState, buttonTypeCount)
-	// }
-	// world := MasterWorldview{
-	// 	Calls: Calls{
-	// 		Calls: calls,
-	// 	},
-	// }
+	var networkID, floorCount, elevatorCount, networkPort, hardwarePort int
+
+	flag.IntVar(&networkID, "network-id", -1, "Elevator network ID. Must larger or equal to 1")
+	flag.IntVar(&floorCount, "floor-count", 4, "Number of floors")
+	flag.IntVar(&elevatorCount, "elevator-count", 3, "Number of elevators")
+	flag.IntVar(&networkPort, "network-port", 30045, "Network port")
+	flag.IntVar(&hardwarePort, "hardware-port", 15657, "Hardware port")
+
+	flag.Parse()
+
+	if !areFlagsValid(networkID, floorCount, elevatorCount, networkPort, hardwarePort) {
+		log.Fatal("All arguments are required and must be valid: -network-id, -floor-count, -elevator-count, -network-port, -hardware-port")
+	}
+
+	fmt.Printf("Arguments are networkID=%d, floorCount=%d, elevatorCount=%d, networkPort=%d, hardwarePort=%d\n", networkID, floorCount, elevatorCount, networkPort, hardwarePort)
+
+	buttonTypeCount := 2 + elevatorCount
 
 	// Make sure to check if networkID is valid (between 1 and elevatorCount)
 
-	const networkPort int = 30045
-	const floorCount int = 4
-	const elevatorCount int = 3
-	const networkID int = 1
-	const buttonTypeCount int = 2 + elevatorCount // the number 2 is hall down and hall up, elevatorCount because one list of cab calls per elevator
+	// const networkPort int = 30045
+	// const floorCount int = 4
+	// const elevatorCount int = 3
+	// const networkID int = 1
+	// const buttonTypeCount int = 2 + elevatorCount // the number 2 is hall down and hall up, elevatorCount because one list of cab calls per elevator
 
 	const channelBufferSize int = 16
 
-	broadcastEvents := make(chan []byte, channelBufferSize) //maybe remove buffer when emptying in server
+	// broadcastEvents := make(chan []byte, channelBufferSize) //maybe remove buffer when emptying in server
 	// watchdogNetworkCommands := make(chan string, channelBufferSize)
 	masterNetworkCommands := make(chan MasterWorldview, channelBufferSize)
 	slaveNetworkCommands := make(chan SlaveWorldview, channelBufferSize)
-	broadcastCommands := make(chan []byte, channelBufferSize)
+	// broadcastCommands := make(chan []byte, channelBufferSize)
 	masterNetworkEvents := make(chan interface{}, channelBufferSize)
 	slaveNetworkEvents := make(chan MasterWorldview, channelBufferSize)
 
-	go network.Transmitter(broadcastCommands, networkPort)
-	go network.Receiver(broadcastEvents, networkPort)
-	go network.Server(broadcastEvents,
-		masterNetworkCommands,
+	// go network.Transmitter(broadcastCommands, networkPort)
+	// go network.Receiver(broadcastEvents, networkPort)
+	go network.Server(masterNetworkCommands,
 		slaveNetworkCommands,
-		broadcastCommands,
 		masterNetworkEvents,
 		slaveNetworkEvents,
+		networkPort,
 		networkID,
 		elevatorCount)
 	go master.Server(masterNetworkEvents, masterNetworkCommands, networkID, floorCount, buttonTypeCount, elevatorCount)
-	go slave.Server(slaveNetworkEvents, slaveNetworkCommands, networkID, floorCount, buttonTypeCount)
+	go slave.Server(slaveNetworkEvents, slaveNetworkCommands, networkID, floorCount, buttonTypeCount, hardwarePort)
 
 	fmt.Println("Finished setting up goroutines.")
 

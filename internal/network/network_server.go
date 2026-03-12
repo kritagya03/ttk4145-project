@@ -1,9 +1,8 @@
 package network
 
 import (
-	"encoding/json"
+	"Network-go/network/bcast"
 	"fmt"
-	"reflect"
 	"time"
 
 	. "github.com/kritagya03/ttk4145-project/internal/models"
@@ -31,20 +30,30 @@ func resetTimer(timer *time.Timer) {
 		}
 	}
 	timer.Reset(HeartbeatTimeout)
-	fmt.Println("network_server.go resetTimer - Timer has been reset.")
+	// fmt.Println("network_server.go resetTimer - Timer has been reset.")
 }
 
 // TODO: Add NewSlaveConnection
 
-func Server(
-	broadcastEvents <-chan []byte,
-	masterNetworkCommands <-chan MasterWorldview,
+func Server(masterNetworkCommands <-chan MasterWorldview,
 	slaveNetworkCommands <-chan SlaveWorldview,
-	broadcastCommands chan<- []byte,
 	masterNetworkEvents chan<- interface{},
 	slaveNetworkEvents chan<- MasterWorldview,
+	networkPort int,
 	networkID int,
 	elevatorCount int) {
+
+	// TODO: also used in main.go
+	const channelBufferSize int = 16
+
+	// TODO: change terrible variable names
+	masterWorldivewTransmit := make(chan MasterWorldview, channelBufferSize)
+	masterWorldviewReceive := make(chan MasterWorldview, channelBufferSize)
+	slaveWorldviewTransmit := make(chan SlaveWorldview, channelBufferSize)
+	slaveWorldviewReceive := make(chan SlaveWorldview, channelBufferSize)
+
+	go bcast.Transmitter(networkPort, masterWorldivewTransmit, slaveWorldviewTransmit)
+	go bcast.Receiver(networkPort, masterWorldviewReceive, slaveWorldviewReceive)
 
 	masterHeartbeatTimer := time.NewTimer(HeartbeatTimeout)
 	masterHeartbeatTimer.Stop()
@@ -71,50 +80,39 @@ func Server(
 
 	for {
 		select {
-		case broadcastEvent := <-broadcastEvents:
-			fmt.Println("network_server.go case broadcastEvents. Received broadcast event, attempting to decode worldview.")
-			worldview := packetToWorldview(broadcastEvent)
-			if worldview == nil {
-				fmt.Println("network_server.go case broadcastEvents. Received invalid packet, skipping.")
+
+		case worldview := <-masterWorldviewReceive:
+			if masterIsTimedOut && worldview.NetworkID != networkID {
+				fmt.Println("network_server.go case masterWorldviewReceive. Received MasterWorldview while master was previously timed out, sending MasterWorldview to masterNetworkEvents channel.")
+				masterNetworkEvents <- NewMasterConnection(0)
+				masterIsTimedOut = false
+			}
+			// fmt.Printf("network_server.go case masterWorldviewReceive. Sending MasterWorldview to slaveNetworkEvents channel. worldview = %v\n", worldview)
+			masterNetworkEvents <- worldview // Combining multiple masters after network partition
+			slaveNetworkEvents <- worldview
+			resetTimer(masterHeartbeatTimer)
+
+		case worldview := <-slaveWorldviewReceive:
+			if !isValidNetworkID(worldview.NetworkID, elevatorCount) {
+				fmt.Printf("network_server.go case slaveWorldviewReceive. Received SlaveWorldview with invalid NetworkID: %d\n", worldview.NetworkID)
 				continue
 			}
-			switch worldview := worldview.(type) {
-			case MasterWorldview:
-				if masterIsTimedOut && worldview.NetworkID != networkID {
-					fmt.Println("network_server.go case broadcastEvents. Received MasterWorldview while master was previously timed out, sending MasterWorldview to masterNetworkEvents channel.")
-					masterNetworkEvents <- NewMasterConnection(0)
-					masterIsTimedOut = false
-				}
-				fmt.Printf("network_server.go case broadcastEvents. Sending MasterWorldview to slaveNetworkEvents channel. worldview = %v\n", worldview)
-				masterNetworkEvents <- worldview // Combining multiple masters after network partition
-				slaveNetworkEvents <- worldview
-				resetTimer(masterHeartbeatTimer)
-			case SlaveWorldview:
-				if !isValidNetworkID(worldview.NetworkID, elevatorCount) {
-					fmt.Printf("network_server.go case broadcastEvents. Received SlaveWorldview with invalid NetworkID: %d\n", worldview.NetworkID)
-					continue
-				}
-				if slaveIsTimedOutList[worldview.NetworkID-1] {
-					fmt.Printf("network_server.go case broadcastEvents. Received SlaveWorldview from NetworkID %d while slave was previously timed out, sending NewSlaveConnection to masterNetworkEvents channel to trigger appropriate handling.\n", worldview.NetworkID)
-					masterNetworkEvents <- NewSlaveConnection{NetworkID: worldview.NetworkID}
-					// masterNetworkEvents <- worldview // TODO: should the SlaveWorldview be sent to masterNetworkEvents?
-					slaveIsTimedOutList[worldview.NetworkID-1] = false
-				}
-				fmt.Printf("network_server.go case broadcastEvents. Sending SlaveWorldview to masterNetworkEvents channel. worldview = %v\n", worldview)
-				masterNetworkEvents <- worldview
-				resetTimer(slaveHeartbeatTimers[worldview.NetworkID-1])
-				fmt.Printf("network_server.go case broadcastEvents. Reset slave heartbeat timer for NetworkID %d\n", worldview.NetworkID)
-			default:
-				fmt.Printf("network_server.go case broadcastEvents. Received unknown worldview type: %T\n", worldview)
+			if slaveIsTimedOutList[worldview.NetworkID-1] {
+				fmt.Printf("network_server.go case slaveWorldviewReceive. Received SlaveWorldview from NetworkID %d while slave was previously timed out, sending NewSlaveConnection to masterNetworkEvents channel to trigger appropriate handling.\n", worldview.NetworkID)
+				masterNetworkEvents <- NewSlaveConnection{NetworkID: worldview.NetworkID}
+				// masterNetworkEvents <- worldview // TODO: should the SlaveWorldview be sent to masterNetworkEvents?
+				slaveIsTimedOutList[worldview.NetworkID-1] = false
 			}
+			// fmt.Printf("network_server.go case slaveWorldviewReceive. Sending SlaveWorldview to masterNetworkEvents channel. worldview = %v\n", worldview)
+			masterNetworkEvents <- worldview
+			resetTimer(slaveHeartbeatTimers[worldview.NetworkID-1])
+			// fmt.Printf("network_server.go case slaveWorldviewReceive. Reset slave heartbeat timer for NetworkID %d\n", worldview.NetworkID)
 		case masterCommand := <-masterNetworkCommands:
-			fmt.Println("network_server.go case masterNetworkCommands.")
-			packet := worldviewToPacket(masterCommand)
-			broadcastCommands <- packet
+			// fmt.Println("network_server.go case masterNetworkCommands.")
+			masterWorldivewTransmit <- masterCommand
 		case slaveCommand := <-slaveNetworkCommands:
-			fmt.Println("network_server.go case slaveNetworkCommands.")
-			packet := worldviewToPacket(slaveCommand)
-			broadcastCommands <- packet
+			// fmt.Println("network_server.go case slaveNetworkCommands.")
+			slaveWorldviewTransmit <- slaveCommand
 		case <-masterHeartbeatTimer.C:
 			fmt.Println("network_server.go case masterHeartbeatTimer.C. Master heartbeat timeout.")
 			masterIsTimedOut = true
@@ -126,66 +124,4 @@ func Server(
 			slaveIsTimedOutList[slaveNetworkID-1] = true
 		}
 	}
-}
-
-// Don't panic incase of receiving packets from unintented senders.
-func packetToWorldview(packet []byte) interface{} {
-	var typeTagged typeTaggedJSON
-	if errorPacket := json.Unmarshal(packet, &typeTagged); errorPacket != nil {
-		fmt.Printf("Failed to decode packet to typeTaggedJSON: %v\n", errorPacket)
-		// panic(fmt.Sprintf("Failed to decode packet to typeTaggedJSON: %v\n", errorPacket)) // TODO: temporary
-		return nil
-	}
-
-	switch typeTagged.Type {
-	case reflect.TypeFor[MasterWorldview]().String():
-		var worldview MasterWorldview
-		if errorPayload := json.Unmarshal(typeTagged.Payload, &worldview); errorPayload != nil {
-			fmt.Printf("Failed to decode payload to MasterWorldview: %v\n", errorPayload)
-			return nil
-		}
-		return worldview
-
-	case reflect.TypeFor[SlaveWorldview]().String():
-		var worldview SlaveWorldview
-		if errorPayload := json.Unmarshal(typeTagged.Payload, &worldview); errorPayload != nil {
-			fmt.Printf("Failed to decode payload to SlaveWorldview: %v\n", errorPayload)
-			return nil
-		}
-		return worldview
-
-	default:
-		fmt.Printf("Unknown worldview type: %s\n", typeTagged.Type)
-		return nil
-	}
-}
-
-func worldviewToPacket[worldviewType WorldviewType](worldview worldviewType) []byte {
-	typeName := reflect.TypeFor[worldviewType]().String()
-	fmt.Printf("network_server.go worldviewToPacket. typeName = %v\n", typeName)
-
-	jsonData, errorEncodingWorldview := json.Marshal(worldview)
-	if errorEncodingWorldview != nil {
-		panic(fmt.Sprintf(
-			"Failed to encode worldview to JSON (Type: %v, Payload: %v): %v",
-			typeName, jsonData, errorEncodingWorldview))
-	}
-
-	packet, err := json.Marshal(typeTaggedJSON{
-		Type:    typeName,
-		Payload: jsonData,
-	})
-	if err != nil {
-		panic(fmt.Sprintf(
-			"Failed to encode worldview to typeTaggedJSON (Type: %v, Payload: %v)",
-			typeName, jsonData))
-	}
-
-	if len(packet) > NetworkBufferSize {
-		panic(fmt.Sprintf(
-			"Packet too large (length: %d, max: %d)",
-			len(packet), NetworkBufferSize))
-	}
-
-	return packet
 }

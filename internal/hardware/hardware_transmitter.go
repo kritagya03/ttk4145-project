@@ -25,5 +25,3 @@ func Transmitter(hardwareCommands <-chan []byte, destinationAddress string) {
 		}
 	}
 }
-
-

@@ -1,5 +1,45 @@
 package models
 
+// ! TODO: Temporar, remove
+
+// type ButtonTypeWrapper elevio.ButtonType
+
+// func (buttonType ButtonTypeWrapper) String() string {
+// 	switch buttonType {
+// 	case ButtonTypeWrapper(elevio.BT_HallUp):
+// 		return "HallUp"
+// 	case ButtonTypeWrapper(elevio.BT_HallDown):
+// 		return "HallDown"
+// 	case ButtonTypeWrapper(elevio.BT_Cab):
+// 		return "Cab"
+// 	default:
+// 		return fmt.Sprintf("Unknown:%d", buttonType)
+// 	}
+// }
+
+// type ButtonEventWrapper elevio.ButtonEvent
+
+// func (buttonEvent ButtonEventWrapper) String() string {
+// 	return fmt.Sprintf("Floor: %d, Button: %s", buttonEvent.Floor, buttonEvent.Button)
+// }
+
+// type MotorDirectionWrapper elevio.MotorDirection
+
+// func (motorDirection MotorDirectionWrapper) String() string {
+// 	switch motorDirection {
+// 	case MotorDirectionWrapper(elevio.MD_Up):
+// 		return "Up"
+// 	case MotorDirectionWrapper(elevio.MD_Down):
+// 		return "Down"
+// 	case MotorDirectionWrapper(elevio.MD_Stop):
+// 		return "Stop"
+// 	default:
+// 		return fmt.Sprintf("Unknown:%d", motorDirection)
+// 	}
+// }
+
+// ! OLD BELOW
+
 // type ElevatorDirection int
 
 // Error because also implemented in types.go

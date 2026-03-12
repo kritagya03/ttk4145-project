@@ -42,7 +42,8 @@ func Server(
 	obstructionEventReceiver := make(chan bool)
 	stopEventReceiver := make(chan bool)
 
-	elevio.Init("localhost:15657", floorCount)
+	// elevio.Init("localhost:15657", floorCount)
+	elevio.Init("localhost:16006", floorCount)
 
 	go elevio.PollButtons(buttonEventReceiver)
 	go elevio.PollFloorSensor(floorEventReceiver)
@@ -61,8 +62,6 @@ func Server(
 		select {
 		case masterWorldview := <-slaveNetworkEvents:
 			fmt.Printf("slave.go case slaveNetworkEvents. Received MasterWorldview: %+v\n", masterWorldview)
-			// ! Implement
-			// ! TODO: setAllLights should only be called from here because orders are only assigned or set to none here
 
 			slaveWorldview = getNewSlaveWorldview(slaveWorldview, masterWorldview)
 
@@ -129,6 +128,10 @@ func Server(
 			}
 
 		case <-heartbeatTicker.C:
+			if slaveWorldview.FloorLastVisited < 0 || slaveWorldview.FloorLastVisited >= floorCount {
+				fmt.Printf("Invalid floorLastVisited %d, not sending slave heartbeat.\n", slaveWorldview.FloorLastVisited)
+				continue
+			}
 			fmt.Println("Slave heartbeat. Current SlaveWorldview:", slaveWorldview)
 			slaveNetworkCommands <- slaveWorldview
 
@@ -254,7 +257,7 @@ func setAllLights(elevator SlaveWorldview) {
 		for _, matrixIndex := range matrixIndices {
 			callState := matrix[floor][matrixIndex]
 			isCallAssigned := int(callState) > 0
-			turnOn := isCallAssigned || callState == CallStateCompleted
+			turnOn := isCallAssigned
 			buttonType := matrixIndexToButtonType(matrixIndex)
 			elevio.SetButtonLamp(buttonType, floor, turnOn)
 		}
@@ -483,7 +486,7 @@ func getNewSlaveWorldview(slaveWorldview SlaveWorldview, masterWorldview MasterW
 	for floor := range slaveMatrix {
 		for buttonType := range slaveMatrix[floor] {
 			masterCallState := masterMatrix[floor][buttonType]
-			slaveCallState := masterMatrix[floor][buttonType]
+			slaveCallState := slaveMatrix[floor][buttonType]
 			isMasterCallAssignedToElevator := isCallAssignedToElevator(masterCallState, slaveWorldview.NetworkID)
 			if masterCallState == CallStateNone {
 				if isMasterCallAssignedToElevator || slaveCallState == CallStateCompleted {

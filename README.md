@@ -45,3 +45,15 @@ Models:
 
 
 Better code quality for importing models
+
+Fault Tolerance:
+process pairs
+go through specs
+acceptance tests
+
+
+
+Current errors:
+call on same floor activates ALL lights on that floor (hallup. halldown, cab)
+ -> Removed Completed as a reason to keep the lights on at setAllLights
+ -> || callState == CallStateCompleted

@@ -19,9 +19,8 @@ func Receiver(broadcastEvents chan<- []byte, receivingPort int) {
 	}
 	defer receiveConnection.Close()
 
-	packetBuffer := make([]byte, NetworkBufferSize)
-
 	for {
+		packetBuffer := make([]byte, NetworkBufferSize)
 		packetByteCount, receivedAddress, readError := receiveConnection.ReadFromUDP(packetBuffer)
 		if readError != nil {
 			fmt.Println("Error reading:", readError)

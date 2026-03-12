@@ -59,6 +59,14 @@ type SlaveWorldview struct {
 	Calls            CallsMatrix
 }
 
+// func (slaveWorldview SlaveWorldview) String() string {
+// 	return fmt.Sprintf("NetworkID: %d, Behaviour: %s, Direction: %v, FloorLastVisited: %d, Calls: %s", slaveWorldview.NetworkID, slaveWorldview.Behaviour, slaveWorldview.Direction, slaveWorldview.FloorLastVisited, slaveWorldview.Calls)
+// }
+
+// func (elevatorBehaviour ElevatorBehaviour) String() string {
+// 	return [...]string{"Idle", "DoorOpen", "Moving"}[elevatorBehaviour]
+// }
+
 type NewMasterConnection int
 type MasterTimeout int
 

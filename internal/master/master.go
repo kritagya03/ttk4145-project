@@ -37,7 +37,7 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 	}
 
 	electionTimeout := time.NewTimer(BaseElectionTimeout * time.Duration(networkID))
-	electionTimeout.Stop()
+	// electionTimeout.Stop() // Maybe start in single elevator mode, so don't stop the timer
 
 	mergingMastersTimeout := time.NewTimer(MergingMastersTimeoutDuration)
 	mergingMastersTimeout.Stop()

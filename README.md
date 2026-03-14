@@ -5,12 +5,34 @@ TTK4145 elevator project at NTNU, made with Joachim Frydenlund and Henrik Markes
 ## How to run
 
 ```sh
+elevatorserver
+
+sudo apt update && sudo apt install gnome-terminal
 git clone https://github.com/kritagya03/ttk4145-project.git
 cd ./ttk4145-project/cmd/elevator
-go run ./main.go -network-id 1 -hardware-port 16001
+go run ./main.go -network-id 1
+```
+
+Testing:
+```sh
+simelevatorserver --port 16002
+
+cd ./ttk4145-project/cmd/elevator
+go run ./main.go -network-id 2 -hardware-port 16002
+
+simelevatorserver --port 16003
+
+cd ./ttk4145-project/cmd/elevator
+go run ./main.go -network-id 3 -hardware-port 16003
 ```
 
 Or install the project through go
+
+## Ask studass
+* If behavior is idle and door is closed, can it go to another floor before opening doors
+* Does the obstruction sensor being on imply door open?
+* When starting with door open between floors, the elevator moves with the door open. Is this allowed?
+* If elevator moves between floors to serve call, but receives powerloss between floors, should it continue in the same direction on startup?
 
 ## TODO
 
@@ -70,8 +92,10 @@ Current errors:
  Poll rate in 10ms, heartbeat is 5 ??
 * when master dies most of the slaves die (but one might become the new master on rare occasions)
 * When any elevator adds a hall call on the same floor as a elevator, that elevator also turns on its cab call light on that floor
+* When a slave is in floor 0, slave has cab calls on floors 1,2,3, slave moving between floor 0 to floor 1, master dies, a cab order on floor 0 spawns.
 
 
  Possible huge erros:
  * We are passing [][]CallState slices around believing we get deep copies, but a slice is maybe represented as a pointer such that we get shallow copies. We might need to implement a deep copy function for [][]CallState. Since SlaveWorldview and MasterWorldview uses [][]CallState we might need to implement a deep copy for both worldviews too.
 
+Possible rrrors:

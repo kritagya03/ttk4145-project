@@ -90,6 +90,8 @@ func main() {
 	time.Sleep(time.Hour) // ! TODO: CHANGE TO WAIT FOR SOMETHING
 }
 
+
+
 func testSendSlaveWorldview(networkID int, floorCount int, buttonTypeCount int, elevatorCount int, masterNetworkCommands chan<- MasterWorldview, slaveNetworkCommands chan<- SlaveWorldview) {
 	callsSlave := make([][]CallState, floorCount)
 	for i := range callsSlave {

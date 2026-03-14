@@ -22,6 +22,7 @@ const (
 	masterActive
 	masterMerging // TODO: maybe change name because also merging master worldviews if not in this state
 )
+const StuckTimeoutDuration = 10 * time.Second // ! TODO: Maybe change
 
 // TODO: Make the state machine more beautiful (good code quality, keep events on the outside and state on the inside)
 
@@ -31,9 +32,11 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 
 	slaveWorldviewList := make([]SlaveWorldview, elevatorCount) // TODO: maybe change variable name
 	slaveOnlineList := make([]bool, elevatorCount)              // TODO: maybe change variable name
+	slaveLastStateChange := make([]time.Time, elevatorCount)
 	for slaveIndex := range slaveWorldviewList {
 		slaveWorldviewList[slaveIndex] = getDefaultSlaveWorldview(slaveIndex + 1)
 		slaveOnlineList[slaveIndex] = false
+		slaveLastStateChange[slaveIndex] = time.Now()
 	}
 
 	electionTimeout := time.NewTimer(BaseElectionTimeout * time.Duration(networkID))
@@ -59,42 +62,61 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 			case SlaveWorldview:
 				slaveWorldview := event
 				fmt.Printf("master.go case masterNetworkEvents. Received SlaveWorldview: %v\n", slaveWorldview)
-				slaveWorldviewList[slaveWorldview.NetworkID-1] = slaveWorldview
+				id := slaveWorldview.NetworkID - 1
+				prevState := slaveWorldviewList[id]
+
+				if prevState.Behaviour != slaveWorldview.Behaviour ||
+					prevState.FloorLastVisited != slaveWorldview.FloorLastVisited ||
+					prevState.Direction != slaveWorldview.Direction {
+					slaveLastStateChange[id] = time.Now()
+				}
+
+				slaveWorldviewList[id] = slaveWorldview
 				if masterState == masterActive {
-					masterWorldview = getNewMasterWorldview(masterWorldview, slaveWorldview, slaveWorldviewList, slaveOnlineList)
+					masterWorldview = getNewMasterWorldview(masterWorldview, slaveWorldview, slaveWorldviewList, slaveOnlineList, slaveLastStateChange)
 				}
 
 			case MasterWorldview:
 				receivedMasterWorldview := event
 				fmt.Printf("master.go case masterNetworkEvents. Received MasterWorldview: %v\n", receivedMasterWorldview)
-				masterWorldview = getMergedMasterWorldview(masterWorldview, receivedMasterWorldview, elevatorCount)
+				switch masterState {
+				case masterActive:
+					continue
+				case masterInactive, masterCandidate:
+					masterWorldview = receivedMasterWorldview
+				case masterMerging:
+					fmt.Println("Received MasterWorldview while in Merging state, merging received MasterWorldview with current MasterWorldview.")
+					masterWorldview = getMergedMasterWorldview(masterWorldview, receivedMasterWorldview, elevatorCount)
+				}
 
 			case NewMasterConnection:
-				fmt.Printf("master.go case masterNetworkEvents. Received New Master Connection: %d\n", event)
+				fmt.Printf("\n\nmaster.go case masterNetworkEvents. Received New Master Connection: %d\n\n\n", event)
 				switch masterState {
 				case masterCandidate:
-					fmt.Println("master.go case masterNetworkEvents. Received New Master Connection while in Candidate state.")
+					fmt.Println("\n\nmaster.go case masterNetworkEvents. Received New Master Connection while in Candidate state.\n\n")
 					masterState = masterInactive
 				case masterActive:
-					fmt.Println("master.go case masterNetworkEvents. Received New Master Connection while in Active state.")
+					fmt.Println("\n\nmaster.go case masterNetworkEvents. Received New Master Connection while in Active state.\n\n")
 					masterState = masterMerging
 					resetTimer(mergingMastersTimeout, MergingMastersTimeoutDuration)
 				case masterMerging:
-					fmt.Println("master.go case masterNetworkEvents. Received New Master Connection while in Merging state")
+					fmt.Println("\n\nmaster.go case masterNetworkEvents. Received New Master Connection while in Merging state\n\n")
 					resetTimer(mergingMastersTimeout, MergingMastersTimeoutDuration)
 				case masterInactive:
-					fmt.Println("master.go case masterNetworkEvents. Received New Master Connection while in Inactive state")
+					fmt.Println("\n\nmaster.go case masterNetworkEvents. Received New Master Connection while in Inactive state\n\n")
 				default:
 					panic(fmt.Sprintf("master.go case masterNetworkEvents. Received unknown event type: %T, value: %v", event, event))
 				}
 
 			case NewSlaveConnection:
 				slaveConnection := event
-				fmt.Printf("master.go case masterNetworkEvents. Received New Slave Connection with network ID: %d\n", slaveConnection.NetworkID)
-				slaveOnlineList[slaveConnection.NetworkID-1] = true
+				fmt.Printf("\n\nmaster.go case masterNetworkEvents. Received New Slave Connection with network ID: %d\n\n\n", slaveConnection.NetworkID)
+				id := slaveConnection.NetworkID - 1
+				slaveOnlineList[id] = true
+				slaveLastStateChange[id] = time.Now()
 
 			case MasterTimeout:
-				fmt.Println("master.go case masterNetworkEvents. Received Master Timeout.")
+				fmt.Println("\n\nmaster.go case masterNetworkEvents. Received Master Timeout.\n\n")
 				if masterState != masterActive {
 					masterState = masterCandidate
 					resetTimer(electionTimeout, BaseElectionTimeout*time.Duration(networkID)) // TODO: Currently resetting this timer in two locations, maybe only need to reset in one location.
@@ -102,7 +124,7 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 
 			case SlaveTimeout:
 				slaveTimeout := event
-				fmt.Printf("master.go case masterNetworkEvents. Received Slave Timeout with Network ID: %d\n", slaveTimeout.NetworkID)
+				fmt.Printf("\n\nmaster.go case masterNetworkEvents. Received Slave Timeout with Network ID: %d\n\n\n", slaveTimeout.NetworkID)
 				slaveOnlineList[slaveTimeout.NetworkID-1] = false
 
 			default:
@@ -115,12 +137,12 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 			}
 		case <-electionTimeout.C:
 			if masterState == masterCandidate {
-				fmt.Println("Election timeout. Transitioning to masterActive state.")
+				fmt.Println("\n\nElection timeout. Transitioning to masterActive state.\n\n")
 				masterState = masterActive
 			}
 		case <-mergingMastersTimeout.C:
 			if masterState == masterMerging {
-				fmt.Println("Merging Masters timeout. Transitioning to masterCandidate state.")
+				fmt.Println("\n\nMerging Masters timeout. Transitioning to masterCandidate state.\n\n")
 				masterState = masterCandidate
 				resetTimer(electionTimeout, BaseElectionTimeout*time.Duration(networkID)) // TODO: Currently resetting this timer in two locations, maybe only need to reset in one location.
 			}
@@ -164,7 +186,7 @@ func getDefaultSlaveWorldview(networkID int) SlaveWorldview {
 		NetworkID:        networkID,
 		FloorLastVisited: -1,
 		Direction:        elevio.MD_Stop,
-		Behaviour:        BehaviourIdle,
+		Behaviour:        BehaviourDoorOpen,
 	}
 }
 
@@ -177,7 +199,7 @@ func isCallAssigned(callState CallState, elevatorCount int) bool {
 }
 
 // TODO: assumes master matrix and slave matrix are of the same dimensions
-func getNewMasterWorldview(masterWorldview MasterWorldview, slaveWorldview SlaveWorldview, slaveWorldviewList []SlaveWorldview, slaveOnlineList []bool) MasterWorldview {
+func getNewMasterWorldview(masterWorldview MasterWorldview, slaveWorldview SlaveWorldview, slaveWorldviewList []SlaveWorldview, slaveOnlineList []bool, slaveLastStateChange []time.Time) MasterWorldview {
 	elevatorCount := len(slaveWorldviewList)
 	masterMatrix := masterWorldview.Calls.Matrix
 	slaveMatrix := slaveWorldview.Calls.Matrix
@@ -194,7 +216,7 @@ func getNewMasterWorldview(masterWorldview MasterWorldview, slaveWorldview Slave
 		}
 	}
 	masterWorldview.Calls.Matrix = masterMatrix
-	assignCalls(masterWorldview, slaveWorldviewList, slaveOnlineList)
+	assignCalls(masterWorldview, slaveWorldviewList, slaveOnlineList, slaveLastStateChange)
 	return masterWorldview
 }
 
@@ -212,9 +234,10 @@ type hallCallAssignerElevatorState struct {
 
 type hallCallAssignerOutput map[string][][]bool
 
-func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorldview, slaveOnlineList []bool) MasterWorldview {
+func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorldview, slaveOnlineList []bool, slaveLastStateChange []time.Time) MasterWorldview {
 	floorCount := len(masterWorldview.Calls.Matrix)
 	elevatorCount := len(slaveWorldviewList)
+	// unchangedMasterWorldview := masterWorldview
 
 	hallCallsMatrix := make([][]bool, floorCount)
 	for floor := range floorCount {
@@ -233,7 +256,16 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 	elevatorStatesMap := make(map[string]hallCallAssignerElevatorState)
 	for _, slaveWorldview := range slaveWorldviewList {
 		// || slaveWorldview.FloorLastVisited < 0 || slaveWorldview.FloorLastVisited >= floorCount  // for fixing weird bug
-		if slaveOnlineList[slaveWorldview.NetworkID-1] == false {
+		id := slaveWorldview.NetworkID - 1
+		isOnline := slaveOnlineList[id]
+		if !isOnline {
+			fmt.Printf("Elevator %d is offline. Temporarily excluding from HCA to reassign its orders.\n", slaveWorldview.NetworkID)
+			continue
+		}
+
+		isStuck := slaveWorldview.Behaviour != BehaviourIdle && time.Since(slaveLastStateChange[id]) > StuckTimeoutDuration
+		if isStuck {
+			fmt.Printf("\nElevator %d is STUCK! Temporarily excluding from HCA to reassign its orders.\n\n", slaveWorldview.NetworkID)
 			continue
 		}
 
@@ -270,7 +302,8 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 	}
 
 	if len(elevatorStatesMap) == 0 {
-		fmt.Println("Don't assign calls because no connected slaves.")
+		fmt.Println("\n\nDon't assign calls because no connected or unstuck slaves.\n\n")
+		// return unchangedMasterWorldview
 		return masterWorldview
 	}
 
@@ -315,9 +348,6 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 			stderr.String(),
 		))
 	}
-
-	// /home/student/Desktop/KrittErKuL/ttk4145-project/bin/hall_call_assigner --input '{"hallRequests":[[false,true],[false,false],[false,false],[true,false]],"states":{"elevator0":{"behaviour":"idle","floor":1,"direction":"down","cabRequests":[false,true,false,false]},"elevator1":{"behaviour":"idle","floor":3,"direction":"up","cabRequests":[true,false,false,false]}}}'
-
 	// Parse output JSON
 	var output hallCallAssignerOutput
 	if errorJSONDecoring := json.Unmarshal(stdout.Bytes(), &output); errorJSONDecoring != nil {

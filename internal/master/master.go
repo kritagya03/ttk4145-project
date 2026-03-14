@@ -85,38 +85,38 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 				case masterInactive, masterCandidate:
 					masterWorldview = receivedMasterWorldview
 				case masterMerging:
-					fmt.Println("\n\nReceived MasterWorldview while in Merging state, merging received MasterWorldview with current MasterWorldview.\n\n")
+					fmt.Println("Received MasterWorldview while in Merging state, merging received MasterWorldview with current MasterWorldview.\n")
 					masterWorldview = getMergedMasterWorldview(masterWorldview, receivedMasterWorldview, elevatorCount)
 				}
 
 			case NewMasterConnection:
-				fmt.Printf("\n\nmaster.go case masterNetworkEvents. Received New Master Connection: %d\n\n\n", event)
+				fmt.Printf("master.go case masterNetworkEvents. Received New Master Connection: %d\n", event)
 				switch masterState {
 				case masterCandidate:
-					fmt.Println("\n\nmaster.go case masterNetworkEvents. Received New Master Connection while in Candidate state. Setting master state to masterInactive.\n\n")
+					fmt.Println("master.go case masterNetworkEvents. Received New Master Connection while in Candidate state. Setting master state to masterInactive.\n")
 					masterState = masterInactive
 				case masterActive:
-					fmt.Println("\n\nmaster.go case masterNetworkEvents. Received New Master Connection while in Active state. Setting master state to masterMerging.\n\n")
+					fmt.Println("master.go case masterNetworkEvents. Received New Master Connection while in Active state. Setting master state to masterMerging.\n")
 					masterState = masterMerging
 					resetTimer(mergingMastersTimeout, MergingMastersTimeoutDuration)
 				case masterMerging:
-					fmt.Println("\n\nmaster.go case masterNetworkEvents. Received New Master Connection while in Merging state. Keeping current master state.\n\n")
+					fmt.Println("master.go case masterNetworkEvents. Received New Master Connection while in Merging state. Keeping current master state.\n")
 					resetTimer(mergingMastersTimeout, MergingMastersTimeoutDuration)
 				case masterInactive:
-					fmt.Println("\n\nmaster.go case masterNetworkEvents. Received New Master Connection while in Inactive state. Keeping current master state.\n\n")
+					fmt.Println("master.go case masterNetworkEvents. Received New Master Connection while in Inactive state. Keeping current master state.\n")
 				default:
 					panic(fmt.Sprintf("master.go case masterNetworkEvents. Received unknown event type: %T, value: %v", event, event))
 				}
 
 			case NewSlaveConnection:
 				slaveConnection := event
-				fmt.Printf("\n\nmaster.go case masterNetworkEvents. Received New Slave Connection with network ID: %d\n\n\n", slaveConnection.NetworkID)
+				fmt.Printf("master.go case masterNetworkEvents. Received New Slave Connection with network ID: %d\n", slaveConnection.NetworkID)
 				id := slaveConnection.NetworkID - 1
 				slaveOnlineList[id] = true
 				slaveLastStateChange[id] = time.Now()
 
 			case MasterTimeout:
-				fmt.Println("\n\nmaster.go case masterNetworkEvents. Received Master Timeout.\n\n")
+				fmt.Println("master.go case masterNetworkEvents. Received Master Timeout.\n")
 				if masterState != masterActive {
 					masterState = masterCandidate
 					resetTimer(electionTimeout, BaseElectionTimeout*time.Duration(networkID)) // TODO: Currently resetting this timer in two locations, maybe only need to reset in one location.
@@ -124,7 +124,7 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 
 			case SlaveTimeout:
 				slaveTimeout := event
-				fmt.Printf("\n\nmaster.go case masterNetworkEvents. Received Slave Timeout with Network ID: %d\n\n\n", slaveTimeout.NetworkID)
+				fmt.Printf("master.go case masterNetworkEvents. Received Slave Timeout with Network ID: %d\n", slaveTimeout.NetworkID)
 				slaveOnlineList[slaveTimeout.NetworkID-1] = false
 
 			default:
@@ -137,12 +137,12 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 			}
 		case <-electionTimeout.C:
 			if masterState == masterCandidate {
-				fmt.Println("\n\nElection timeout. Transitioning to masterActive state.\n\n")
+				fmt.Println("Election timeout. Transitioning to masterActive state.\n")
 				masterState = masterActive
 			}
 		case <-mergingMastersTimeout.C:
 			if masterState == masterMerging {
-				fmt.Println("\n\nMerging Masters timeout. Transitioning to masterCandidate state.\n\n")
+				fmt.Println("Merging Masters timeout. Transitioning to masterCandidate state.\n")
 				masterState = masterCandidate
 				resetTimer(electionTimeout, BaseElectionTimeout*time.Duration(networkID)) // TODO: Currently resetting this timer in two locations, maybe only need to reset in one location.
 			}
@@ -266,7 +266,7 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 
 		isStuck := slaveWorldview.Behaviour != BehaviourIdle && time.Since(slaveLastStateChange[id]) > StuckTimeoutDuration
 		if isStuck {
-			fmt.Printf("\nElevator %d is STUCK! Temporarily excluding from HCA to reassign its orders.\n\n", slaveWorldview.NetworkID)
+			// fmt.Printf("Elevator %d is STUCK! Temporarily excluding from HCA to reassign its orders.\n", slaveWorldview.NetworkID)
 			continue
 		}
 
@@ -303,7 +303,7 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 	}
 
 	if len(elevatorStatesMap) == 0 {
-		fmt.Println("\n\nDon't assign calls because no connected or unstuck slaves.\n\n")
+		fmt.Println("Don't assign calls because no connected or unstuck slaves.\n")
 		// return unchangedMasterWorldview
 		return masterWorldview
 	}

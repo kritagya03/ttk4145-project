@@ -258,7 +258,7 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 		// || slaveWorldview.FloorLastVisited < 0 || slaveWorldview.FloorLastVisited >= floorCount  // for fixing weird bug
 		id := slaveWorldview.NetworkID - 1
 		isOnline := slaveOnlineList[id]
-		if !isOnline {
+		if !isOnline && masterWorldview.NetworkID != slaveWorldview.NetworkID {
 			fmt.Printf("Elevator %d is offline. Temporarily excluding from HCA to reassign its orders.\n", slaveWorldview.NetworkID)
 			continue
 		}

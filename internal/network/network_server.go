@@ -122,8 +122,10 @@ func Server(masterNetworkCommands <-chan MasterWorldview,
 			// Take appropriate action for master timeout
 		case slaveNetworkID := <-slaveTimeouts:
 			fmt.Printf("network_server.go case slaveTimeouts. Slave %d heartbeat timeout.\n", slaveNetworkID)
-			masterNetworkEvents <- SlaveTimeout{NetworkID: slaveNetworkID}
-			slaveIsTimedOutList[slaveNetworkID-1] = true
+			if slaveNetworkID != networkID {
+				masterNetworkEvents <- SlaveTimeout{NetworkID: slaveNetworkID}
+				slaveIsTimedOutList[slaveNetworkID-1] = true
+			}
 		}
 	}
 }

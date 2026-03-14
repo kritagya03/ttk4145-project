@@ -61,7 +61,7 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 			switch event := message.(type) {
 			case SlaveWorldview:
 				slaveWorldview := event
-				fmt.Printf("master.go case masterNetworkEvents. Received SlaveWorldview: %v\n", slaveWorldview)
+				// fmt.Printf("master.go case masterNetworkEvents. Received SlaveWorldview: %v\n", slaveWorldview)
 				id := slaveWorldview.NetworkID - 1
 				prevState := slaveWorldviewList[id]
 
@@ -78,14 +78,14 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 
 			case MasterWorldview:
 				receivedMasterWorldview := event
-				fmt.Printf("master.go case masterNetworkEvents. Received MasterWorldview: %v\n", receivedMasterWorldview)
+				// fmt.Printf("master.go case masterNetworkEvents. Received MasterWorldview: %v\n", receivedMasterWorldview)
 				switch masterState {
-				// case masterActive:
-				// 	continue
+				case masterActive:
+					continue
 				case masterInactive, masterCandidate:
 					masterWorldview = receivedMasterWorldview
-				case masterMerging, masterActive:
-					fmt.Println("Received MasterWorldview while in Merging state, merging received MasterWorldview with current MasterWorldview.")
+				case masterMerging:
+					fmt.Println("\n\nReceived MasterWorldview while in Merging state, merging received MasterWorldview with current MasterWorldview.\n\n")
 					masterWorldview = getMergedMasterWorldview(masterWorldview, receivedMasterWorldview, elevatorCount)
 				}
 
@@ -251,7 +251,7 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 		}
 	}
 
-	fmt.Println("Hall calls matrix prepared for HCA input:", hallCallsMatrix)
+	// fmt.Println("Hall calls matrix prepared for HCA input:", hallCallsMatrix)
 
 	elevatorStatesMap := make(map[string]hallCallAssignerElevatorState)
 	for _, slaveWorldview := range slaveWorldviewList {
@@ -308,7 +308,7 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 		return masterWorldview
 	}
 
-	fmt.Println("Elevator states map prepared for HCA input:", elevatorStatesMap)
+	// fmt.Println("Elevator states map prepared for HCA input:", elevatorStatesMap)
 
 	input := hallCallAssignerInput{
 		HallCalls:      hallCallsMatrix,
@@ -321,7 +321,7 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 	}
 
 	// Prepare command
-	fmt.Println("Running hall call assigner with input:", string(jsonInput))
+	// fmt.Println("Running hall call assigner with input:", string(jsonInput))
 	workingDirectory, _ := os.Getwd()
 	hallCallAssignerPath := filepath.Join(workingDirectory, "..", "..", "bin", "hall_call_assigner")
 	// TODO: Maybe add command line parameters: travelDuration, doorOpenDuration, clearRequestType, includeCab
@@ -382,7 +382,7 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 		}
 	}
 
-	fmt.Println("Updated MasterWorldview after hall call assignment:", masterWorldview)
+	// fmt.Println("Updated MasterWorldview after hall call assignment:", masterWorldview)
 
 	return masterWorldview
 }

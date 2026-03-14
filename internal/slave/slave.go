@@ -70,7 +70,7 @@ func Server(
 	for {
 		select {
 		case masterWorldview := <-slaveNetworkEvents:
-			fmt.Printf("slave.go case slaveNetworkEvents. Received MasterWorldview: %+v\n", masterWorldview)
+			// fmt.Printf("slave.go case slaveNetworkEvents. Received MasterWorldview: %+v\n", masterWorldview)
 
 			slaveWorldview = getNewSlaveWorldview(slaveWorldview, masterWorldview)
 
@@ -132,7 +132,7 @@ func Server(
 				fmt.Printf("Invalid floorLastVisited %d, not sending slave heartbeat.\n", slaveWorldview.FloorLastVisited)
 				continue
 			}
-			fmt.Println("Slave heartbeat. Current SlaveWorldview:", slaveWorldview)
+			// fmt.Println("Slave heartbeat. Current SlaveWorldview:", slaveWorldview)
 			slaveNetworkCommands <- slaveWorldview
 
 		case <-doorOpenTimeout.C:

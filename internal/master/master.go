@@ -80,11 +80,11 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 				receivedMasterWorldview := event
 				fmt.Printf("master.go case masterNetworkEvents. Received MasterWorldview: %v\n", receivedMasterWorldview)
 				switch masterState {
-				case masterActive:
-					continue
+				// case masterActive:
+				// 	continue
 				case masterInactive, masterCandidate:
 					masterWorldview = receivedMasterWorldview
-				case masterMerging:
+				case masterMerging, masterActive:
 					fmt.Println("Received MasterWorldview while in Merging state, merging received MasterWorldview with current MasterWorldview.")
 					masterWorldview = getMergedMasterWorldview(masterWorldview, receivedMasterWorldview, elevatorCount)
 				}

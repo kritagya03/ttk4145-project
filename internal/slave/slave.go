@@ -87,17 +87,17 @@ func Server(
 					elevio.SetDoorOpenLamp(true)
 					resetTimer(doorOpenTimeout, DoorOpenTimeoutDuration)
 					*elevator = clearServedCallsAtCurrentFloor(*elevator)
-					fmt.Println("slaveNetworkEvents - BehaviourIdle - New behaviour is BehaviourDoorOpen: Opened door, wanting to start the doorOpenTimeout timer, maybe remove order(s) at floor if possible.")
+					// fmt.Println("slaveNetworkEvents - BehaviourIdle - New behaviour is BehaviourDoorOpen: Opened door, wanting to start the doorOpenTimeout timer, maybe remove order(s) at floor if possible.")
 				case BehaviourMoving:
 					elevio.SetMotorDirection(elevator.Direction)
-					fmt.Println("slaveNetworkEvents - BehaviourIdle - New behaviour is EB_Moving: set the motor direction: ", elevator.Direction)
+					// fmt.Println("slaveNetworkEvents - BehaviourIdle - New behaviour is EB_Moving: set the motor direction: ", elevator.Direction)
 				case BehaviourIdle:
 					// Do nothing
-					fmt.Println("slaveNetworkEvents - BehaviourIdle - New behaviour is BehaviourIdle: Doing nothing")
+					// fmt.Println("slaveNetworkEvents - BehaviourIdle - New behaviour is BehaviourIdle: Doing nothing")
 				}
 			}
 
-			fmt.Println("slaveNetworkEvents: Wanting to update all lights.")
+			// fmt.Println("slaveNetworkEvents: Wanting to update all lights.")
 			setAllLights(*elevator)
 			// fmt.Println("\nNew state:")
 			// elevator.Print()
@@ -223,18 +223,18 @@ func onRequestButtonPress(buttonEvent elevio.ButtonEvent, elevator *SlaveWorldvi
 		} else {
 			matrixIndex := buttonTypeToMatrixIndex(buttonEvent.Button, networkID)
 			elevator.Calls.Matrix[buttonEvent.Floor][matrixIndex] = CallStateOrder
-			fmt.Println("onRequestButtonPress - BehaviourDoorOpen - shouldClearImmediately=false: Added order to e.Requests.")
+			fmt.Println("onRequestButtonPress - BehaviourDoorOpen - shouldClearImmediately=false: Added order.")
 		}
 
 	case BehaviourMoving:
 		matrixIndex := buttonTypeToMatrixIndex(buttonEvent.Button, networkID)
 		elevator.Calls.Matrix[buttonEvent.Floor][matrixIndex] = CallStateOrder
-		fmt.Println("onRequestButtonPress - EB_Moving: Added order to e.Requests.")
+		fmt.Println("onRequestButtonPress - EB_Moving: Added order.")
 
 	case BehaviourIdle:
 		matrixIndex := buttonTypeToMatrixIndex(buttonEvent.Button, networkID)
 		elevator.Calls.Matrix[buttonEvent.Floor][matrixIndex] = CallStateOrder
-		fmt.Println("onRequestButtonPress - BehaviourIdle: Added order to e.Requests.")
+		fmt.Println("onRequestButtonPress - BehaviourIdle: Added order.")
 		// directionBehaviourPair := chooseDirectionBehaviour(*elevator)
 		// elevator.Direction = directionBehaviourPair.Direction
 		// elevator.Behaviour = directionBehaviourPair.Behaviour
@@ -281,7 +281,7 @@ func setAllLights(elevator SlaveWorldview) {
 			elevio.SetButtonLamp(buttonType, floor, turnOn)
 		}
 	}
-	fmt.Println("setAllLights: updated all lights")
+	// fmt.Println("setAllLights: updated all lights")
 }
 
 // onInitializeBetweenFloors moves the elevator down if it starts between floors
@@ -324,12 +324,12 @@ func onFloorArrival(newFloor int, elevator *SlaveWorldview, doorOpenTimeout *tim
 
 // onDoorOpenTimeout handles the door closing
 func onDoorOpenTimeout(elevator *SlaveWorldview, doorOpenTimeout *time.Timer) {
-	fmt.Printf("\n\n%s()\n", "onDoorOpenTimeout")
+	// fmt.Printf("\n\n%s()\n", "onDoorOpenTimeout")
 	// elevator.Print()
 
 	switch elevator.Behaviour {
 	case BehaviourDoorOpen:
-		fmt.Println("onDoorOpenTimeout - BehaviourDoorOpen: choosing new direction.")
+		// fmt.Println("onDoorOpenTimeout - BehaviourDoorOpen: choosing new direction.")
 		directionBehaviourPair := chooseDirectionBehaviour(*elevator)
 		elevator.Direction = directionBehaviourPair.Direction
 		elevator.Behaviour = directionBehaviourPair.Behaviour
@@ -535,21 +535,24 @@ func getNewSlaveWorldview(slaveWorldview SlaveWorldview, masterWorldview MasterW
 
 			// TODO: this also implements that slave can go from (assigned to self) to (none) if master says so, but the master should never say so unless some other elevator does the order or the master has lost the order (NEVER LOSE ORDERS)
 
-			if slaveCallState != CallStateNone {
-				fmt.Printf("\n\n!!!!!!!!!!slave.go - getNewSlaveWorldview: For floor %d, button type %d, masterCallState=%v, slaveCallState=%v, isSlaveCallAssignedToAnyone=%v\n\n\n", floor, buttonType, masterCallState, slaveCallState, isSlaveCallAssignedToAnyone)
-			} else if masterCallState != CallStateNone {
-				fmt.Printf("\n\n!!!!!!!!!!slave.go - getNewSlaveWorldview: For floor %d, button type %d, masterCallState=%v, slaveCallState=%v, isSlaveCallAssignedToAnyone=%v\n\n\n", floor, buttonType, masterCallState, slaveCallState, isSlaveCallAssignedToAnyone)
-			}
+			if slaveCallState != masterCallState {
+				fmt.Println("\n\nslave.go - getNewSlaveWorldview: Detected mismatch in call state for floor ", floor, " button type ", buttonType, ": masterCallState=", masterCallState, " slaveCallState=", slaveCallState, " isMasterCallAssignedToAnyone=", isMasterCallAssignedToAnyone, " isSlaveCallAssignedToAnyone=", isSlaveCallAssignedToAnyone, "\n\n\n")
+
+			// if slaveCallState != CallStateNone {
+			// 	fmt.Printf("\n\n!!!!!!!!!!slave.go - getNewSlaveWorldview: For floor %d, button type %d, masterCallState=%v, slaveCallState=%v, isSlaveCallAssignedToAnyone=%v\n\n\n", floor, buttonType, masterCallState, slaveCallState, isSlaveCallAssignedToAnyone)
+			// } else if masterCallState != CallStateNone {
+			// 	fmt.Printf("\n\n!!!!!!!!!!slave.go - getNewSlaveWorldview: For floor %d, button type %d, masterCallState=%v, slaveCallState=%v, isSlaveCallAssignedToAnyone=%v\n\n\n", floor, buttonType, masterCallState, slaveCallState, isSlaveCallAssignedToAnyone)
+			// }
 
 			if masterCallState == CallStateNone {
 				if isSlaveCallAssignedToAnyone || slaveCallState == CallStateCompleted {
 					slaveMatrix[floor][buttonType] = masterCallState
-					fmt.Printf("\n\nslave.go - getNewSlaveWorldview: Updating call state for floor %d, button type %d\n, from %v to %v\n\n", floor, buttonType, slaveCallState, masterCallState)
+					// fmt.Printf("\n\nslave.go - getNewSlaveWorldview: Updating call state for floor %d, button type %d\n, from %v to %v\n\n", floor, buttonType, slaveCallState, masterCallState)
 				}
 			} else if isMasterCallAssignedToAnyone {
 				if slaveCallState == CallStateNone || slaveCallState == CallStateOrder || isSlaveCallAssignedToAnyone {
 					slaveMatrix[floor][buttonType] = masterCallState
-					fmt.Printf("\n\nslave.go - getNewSlaveWorldview: Updating call state for floor %d, button type %d\n, from %v to %v\n\n", floor, buttonType, slaveCallState, masterCallState)
+					// fmt.Printf("\n\nslave.go - getNewSlaveWorldview: Updating call state for floor %d, button type %d\n, from %v to %v\n\n", floor, buttonType, slaveCallState, masterCallState)
 				}
 			} // else {
 			// 	// master has the call, but it is assigned to somebody else

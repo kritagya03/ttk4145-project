@@ -132,7 +132,7 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 			}
 		case <-heartbeatTicker.C:
 			if masterState == masterActive || masterState == masterMerging {
-				fmt.Println("Master heartbeat. Current MasterWorldview:", masterWorldview)
+				// fmt.Println("Master heartbeat. Current MasterWorldview:", masterWorldview)
 				masterNetworkCommands <- masterWorldview
 			}
 		case <-electionTimeout.C:

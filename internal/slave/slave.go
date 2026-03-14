@@ -537,6 +537,7 @@ func getNewSlaveWorldview(slaveWorldview SlaveWorldview, masterWorldview MasterW
 
 			if slaveCallState != masterCallState {
 				fmt.Println("\n\nslave.go - getNewSlaveWorldview: Detected mismatch in call state for floor ", floor, " button type ", buttonType, ": masterCallState=", masterCallState, " slaveCallState=", slaveCallState, " isMasterCallAssignedToAnyone=", isMasterCallAssignedToAnyone, " isSlaveCallAssignedToAnyone=", isSlaveCallAssignedToAnyone, "\n\n\n")
+			}
 
 			// if slaveCallState != CallStateNone {
 			// 	fmt.Printf("\n\n!!!!!!!!!!slave.go - getNewSlaveWorldview: For floor %d, button type %d, masterCallState=%v, slaveCallState=%v, isSlaveCallAssignedToAnyone=%v\n\n\n", floor, buttonType, masterCallState, slaveCallState, isSlaveCallAssignedToAnyone)

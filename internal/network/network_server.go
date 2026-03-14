@@ -55,8 +55,8 @@ func Server(masterNetworkCommands <-chan MasterWorldview,
 	go bcast.Transmitter(networkPort, masterWorldivewTransmit, slaveWorldviewTransmit)
 	go bcast.Receiver(networkPort, masterWorldviewReceive, slaveWorldviewReceive)
 
-	masterHeartbeatTimer := time.NewTimer(HeartbeatTimeout)
-	masterHeartbeatTimer.Stop()
+	masterHeartbeatTimeout := time.NewTimer(HeartbeatTimeout)
+	masterHeartbeatTimeout.Stop()
 	masterIsTimedOut := true
 
 	slaveHeartbeatTimers := make([]*time.Timer, elevatorCount)
@@ -82,15 +82,20 @@ func Server(masterNetworkCommands <-chan MasterWorldview,
 		select {
 
 		case worldview := <-masterWorldviewReceive:
-			if masterIsTimedOut && worldview.NetworkID != networkID {
-				fmt.Println("network_server.go case masterWorldviewReceive. Received MasterWorldview while master was previously timed out, sending MasterWorldview to masterNetworkEvents channel.")
+			if worldview.NetworkID == networkID {
+				continue
+			}
+
+			if masterIsTimedOut {
+				fmt.Println("network_server.go: Discovered another master. Sending NewMasterConnection.")
 				masterNetworkEvents <- NewMasterConnection(0)
 				masterIsTimedOut = false
 			}
+			
 			// fmt.Printf("network_server.go case masterWorldviewReceive. Sending MasterWorldview to slaveNetworkEvents channel. worldview = %v\n", worldview)
 			masterNetworkEvents <- worldview // Combining multiple masters after network partition
 			slaveNetworkEvents <- worldview
-			resetTimer(masterHeartbeatTimer)
+			resetTimer(masterHeartbeatTimeout)
 
 		case worldview := <-slaveWorldviewReceive:
 			if !isValidNetworkID(worldview.NetworkID, elevatorCount) {
@@ -115,8 +120,8 @@ func Server(masterNetworkCommands <-chan MasterWorldview,
 			// fmt.Println("network_server.go case slaveNetworkCommands.")
 			slaveWorldviewTransmit <- slaveCommand
 			masterNetworkEvents <- slaveCommand
-		case <-masterHeartbeatTimer.C:
-			fmt.Println("network_server.go case masterHeartbeatTimer.C. Master heartbeat timeout.")
+		case <-masterHeartbeatTimeout.C:
+			fmt.Println("network_server.go case masterHeartbeatTimeout.C. Master heartbeat timeout.")
 			masterIsTimedOut = true
 			masterNetworkEvents <- MasterTimeout(0)
 			// Take appropriate action for master timeout

@@ -164,9 +164,10 @@ func deepCopyMatrix(matrix [][]CallState) [][]CallState {
 	return newMatrix
 }
 
-// func isActiveCall(callState CallState, elevatorCount int) bool {
-// 	return callState == CallStateOrder || isCallAssignedToAnyone(callState, elevatorCount)
-// }
+// ! Temp
+func isActiveCall(callState CallState, elevatorCount int) bool {
+	return callState == CallStateOrder || isCallAssignedToAnyone(callState, elevatorCount)
+}
 
 // TODO: weird to have elevatorCount as an argument to the function.
 func getMergedMasterWorldview(masterWorldviewBase MasterWorldview, masterWorldviewNew MasterWorldview, elevatorCount int) MasterWorldview {
@@ -176,8 +177,8 @@ func getMergedMasterWorldview(masterWorldviewBase MasterWorldview, masterWorldvi
 	// TODO: currently assuming both matrixes have the same dimensions
 	for floor := range matrixNew {
 		for buttonType := range matrixNew[floor] {
-			// if matrixMerged[floor][buttonType] == CallStateNone && isActiveCall(matrixNew[floor][buttonType], elevatorCount) {
-			if matrixMerged[floor][buttonType] == CallStateNone && isCallAssignedToAnyone(matrixNew[floor][buttonType], elevatorCount) {
+			// if matrixMerged[floor][buttonType] == CallStateNone && isCallAssignedToAnyone(matrixNew[floor][buttonType], elevatorCount) {
+			if matrixMerged[floor][buttonType] == CallStateNone && isActiveCall(matrixNew[floor][buttonType], elevatorCount) { // ! Temp
 				matrixMerged[floor][buttonType] = matrixNew[floor][buttonType]
 			}
 		}

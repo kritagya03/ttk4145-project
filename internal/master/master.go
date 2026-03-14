@@ -93,17 +93,17 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 				fmt.Printf("\n\nmaster.go case masterNetworkEvents. Received New Master Connection: %d\n\n\n", event)
 				switch masterState {
 				case masterCandidate:
-					fmt.Println("\n\nmaster.go case masterNetworkEvents. Received New Master Connection while in Candidate state.\n\n")
+					fmt.Println("\n\nmaster.go case masterNetworkEvents. Received New Master Connection while in Candidate state. Setting master state to masterInactive.\n\n")
 					masterState = masterInactive
 				case masterActive:
-					fmt.Println("\n\nmaster.go case masterNetworkEvents. Received New Master Connection while in Active state.\n\n")
+					fmt.Println("\n\nmaster.go case masterNetworkEvents. Received New Master Connection while in Active state. Setting master state to masterMerging.\n\n")
 					masterState = masterMerging
 					resetTimer(mergingMastersTimeout, MergingMastersTimeoutDuration)
 				case masterMerging:
-					fmt.Println("\n\nmaster.go case masterNetworkEvents. Received New Master Connection while in Merging state\n\n")
+					fmt.Println("\n\nmaster.go case masterNetworkEvents. Received New Master Connection while in Merging state. Keeping current master state.\n\n")
 					resetTimer(mergingMastersTimeout, MergingMastersTimeoutDuration)
 				case masterInactive:
-					fmt.Println("\n\nmaster.go case masterNetworkEvents. Received New Master Connection while in Inactive state\n\n")
+					fmt.Println("\n\nmaster.go case masterNetworkEvents. Received New Master Connection while in Inactive state. Keeping current master state.\n\n")
 				default:
 					panic(fmt.Sprintf("master.go case masterNetworkEvents. Received unknown event type: %T, value: %v", event, event))
 				}

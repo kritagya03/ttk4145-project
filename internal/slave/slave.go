@@ -275,8 +275,7 @@ func setAllLights(elevator SlaveWorldview) {
 		for _, matrixIndex := range matrixIndices {
 			callState := matrix[floor][matrixIndex]
 			isCallAssignedToAnyone := int(callState) > 0 // TODO: maybe not hardcode
-			// turnOn := isCallAssignedToAnyone
-			turnOn := isCallAssignedToAnyone // || callState == CallStateCompleted // TODO
+			turnOn := isCallAssignedToAnyone             // || callState == CallStateCompleted // TODO
 			buttonType := matrixIndexToButtonType(matrixIndex)
 			elevio.SetButtonLamp(buttonType, floor, turnOn)
 		}

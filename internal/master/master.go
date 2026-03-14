@@ -82,10 +82,14 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 				switch masterState {
 				case masterActive:
 					continue
+					// fmt.Println("master.go MasterWorldview while Active state. Setting master state to masterMerging. Merging received MasterWorldview with current MasterWorldview.")
+					// masterState = masterMerging
+					// resetTimer(mergingMastersTimeout, MergingMastersTimeoutDuration)
+					// masterWorldview = getMergedMasterWorldview(masterWorldview, receivedMasterWorldview, elevatorCount)
 				case masterInactive, masterCandidate:
 					masterWorldview = receivedMasterWorldview
 				case masterMerging:
-					fmt.Println("Received MasterWorldview while masterMerging. Merging received MasterWorldview with current MasterWorldview.\n")
+					fmt.Println("Received MasterWorldview while masterMerging. Merging received MasterWorldview with current MasterWorldview.")
 					masterWorldview = getMergedMasterWorldview(masterWorldview, receivedMasterWorldview, elevatorCount)
 				}
 
@@ -93,17 +97,17 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 				// fmt.Printf("master.go case masterNetworkEvents. Received New Master Connection: %d\n", event)
 				switch masterState {
 				case masterCandidate:
-					fmt.Println("master.go New Master Connection while masterCandidate. Setting masterState to masterInactive.\n")
+					fmt.Println("master.go New Master Connection while masterCandidate. Setting masterState to masterInactive.")
 					masterState = masterInactive
 				case masterActive:
-					fmt.Println("master.go New Master Connection while Active state. Setting master state to masterMerging.\n")
+					fmt.Println("master.go New Master Connection while Active state. Setting master state to masterMerging.")
 					masterState = masterMerging
 					resetTimer(mergingMastersTimeout, MergingMastersTimeoutDuration)
 				case masterMerging:
-					fmt.Println("master.go New Master Connection while Merging state. Keeping current masterState.\n")
+					fmt.Println("master.go New Master Connection while Merging state. Keeping current masterState.")
 					resetTimer(mergingMastersTimeout, MergingMastersTimeoutDuration)
 				case masterInactive:
-					fmt.Println("master.go New Master Connection while Inactive state. Keeping current masterState.\n")
+					fmt.Println("master.go New Master Connection while Inactive state. Keeping current masterState.")
 				default:
 					panic(fmt.Sprintf("master.go case masterNetworkEvents. Received unknown event type: %T, value: %v", event, event))
 				}
@@ -150,6 +154,10 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 	}
 }
 
+// func isActiveCall(callState CallState, elevatorCount int) bool {
+// 	return callState == CallStateOrder || isCallAssignedToAnyone(callState, elevatorCount)
+// }
+
 // TODO: weird to have elevatorCount as an argument to the function.
 func getMergedMasterWorldview(masterWorldviewBase MasterWorldview, masterWorldviewNew MasterWorldview, elevatorCount int) MasterWorldview {
 	masterWorldviewMerged := masterWorldviewBase
@@ -158,7 +166,8 @@ func getMergedMasterWorldview(masterWorldviewBase MasterWorldview, masterWorldvi
 	// TODO: currently assuming both matrixes have the same dimensions
 	for floor := range matrixNew {
 		for buttonType := range matrixNew[floor] {
-			if matrixMerged[floor][buttonType] == CallStateNone && isCallAssigned(matrixNew[floor][buttonType], elevatorCount) {
+			// if matrixMerged[floor][buttonType] == CallStateNone && isActiveCall(matrixNew[floor][buttonType], elevatorCount) {
+			if matrixMerged[floor][buttonType] == CallStateNone && isCallAssignedToAnyone(matrixNew[floor][buttonType], elevatorCount) {
 				matrixMerged[floor][buttonType] = matrixNew[floor][buttonType]
 			}
 		}
@@ -191,7 +200,7 @@ func getDefaultSlaveWorldview(networkID int) SlaveWorldview {
 }
 
 // TODO: also used in slave.go
-func isCallAssigned(callState CallState, elevatorCount int) bool {
+func isCallAssignedToAnyone(callState CallState, elevatorCount int) bool {
 	if int(callState) > 0 && int(callState) <= elevatorCount {
 		return true
 	}
@@ -207,7 +216,7 @@ func getNewMasterWorldview(masterWorldview MasterWorldview, slaveWorldview Slave
 		for buttonType := range masterMatrix[floor] {
 			if masterMatrix[floor][buttonType] == CallStateNone && slaveMatrix[floor][buttonType] == CallStateOrder {
 				masterMatrix[floor][buttonType] = CallStateOrder
-			} else if isCallAssigned(masterMatrix[floor][buttonType], elevatorCount) &&
+			} else if isCallAssignedToAnyone(masterMatrix[floor][buttonType], elevatorCount) &&
 				slaveMatrix[floor][buttonType] == CallStateCompleted &&
 				masterMatrix[floor][buttonType] == CallState(slaveWorldview.NetworkID) {
 
@@ -216,7 +225,7 @@ func getNewMasterWorldview(masterWorldview MasterWorldview, slaveWorldview Slave
 		}
 	}
 	masterWorldview.Calls.Matrix = masterMatrix
-	assignCalls(masterWorldview, slaveWorldviewList, slaveOnlineList, slaveLastStateChange)
+	masterWorldview = assignCalls(masterWorldview, slaveWorldviewList, slaveOnlineList, slaveLastStateChange)
 	return masterWorldview
 }
 
@@ -243,7 +252,7 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 	for floor := range floorCount {
 		hallCallsMatrix[floor] = make([]bool, 2) // TODO: Maybe don't hardcode 2, but rather have a const for the number of hall button types
 		for buttonType := range 2 {              // TODO: Maybe don't hardcode 2, but rather have a const for the number of hall button types
-			if masterWorldview.Calls.Matrix[floor][buttonType] == CallStateOrder || isCallAssigned(masterWorldview.Calls.Matrix[floor][buttonType], elevatorCount) {
+			if masterWorldview.Calls.Matrix[floor][buttonType] == CallStateOrder || isCallAssignedToAnyone(masterWorldview.Calls.Matrix[floor][buttonType], elevatorCount) {
 				hallCallsMatrix[floor][buttonType] = true
 			} else {
 				hallCallsMatrix[floor][buttonType] = false
@@ -274,7 +283,7 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 
 		for floor := range floorCount {
 			buttonType := 2 + slaveWorldview.NetworkID - 1 // TODO: Maybe not hardcode 2. Cab calls start after the hall calls in the button type indexing.
-			if masterWorldview.Calls.Matrix[floor][buttonType] == CallStateOrder || isCallAssigned(masterWorldview.Calls.Matrix[floor][buttonType], elevatorCount) {
+			if masterWorldview.Calls.Matrix[floor][buttonType] == CallStateOrder || isCallAssignedToAnyone(masterWorldview.Calls.Matrix[floor][buttonType], elevatorCount) {
 				cabCalls[floor] = true
 			} else {
 				cabCalls[floor] = false

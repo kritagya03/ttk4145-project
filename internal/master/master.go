@@ -141,12 +141,12 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 			}
 		case <-electionTimeout.C:
 			if masterState == masterCandidate {
-				fmt.Println("Election timeout. Transitioning to masterActive state.\n")
+				fmt.Println("Election timeout. Transitioning to masterActive state.")
 				masterState = masterActive
 			}
 		case <-mergingMastersTimeout.C:
 			if masterState == masterMerging {
-				fmt.Println("Merging Masters timeout. Transitioning to masterCandidate state.\n")
+				fmt.Println("Merging Masters timeout. Transitioning to masterCandidate state.")
 				masterState = masterCandidate
 				resetTimer(electionTimeout, BaseElectionTimeout*time.Duration(networkID)) // TODO: Currently resetting this timer in two locations, maybe only need to reset in one location.
 			}
@@ -180,6 +180,7 @@ func getMergedMasterWorldview(masterWorldviewBase MasterWorldview, masterWorldvi
 			// if matrixMerged[floor][buttonType] == CallStateNone && isCallAssignedToAnyone(matrixNew[floor][buttonType], elevatorCount) {
 			if matrixMerged[floor][buttonType] == CallStateNone && isActiveCall(matrixNew[floor][buttonType], elevatorCount) { // ! Temp
 				matrixMerged[floor][buttonType] = matrixNew[floor][buttonType]
+				fmt.Printf("Merging MasterWorldviews: Updating MasterWorldview from CallStateNone to %v for floor %d, button type %d\n", matrixNew[floor][buttonType], floor, buttonType)
 			}
 		}
 	}
@@ -218,20 +219,27 @@ func isCallAssignedToAnyone(callState CallState, elevatorCount int) bool {
 	return false
 }
 
+func isCallAssignedToSlave(callState CallState, networkID int) bool {
+	if int(callState) == networkID {
+		return true
+	}
+	return false
+}
+
 // TODO: assumes master matrix and slave matrix are of the same dimensions
 func getNewMasterWorldview(masterWorldview MasterWorldview, slaveWorldview SlaveWorldview, slaveWorldviewList []SlaveWorldview, slaveOnlineList []bool, slaveLastStateChange []time.Time) MasterWorldview {
-	elevatorCount := len(slaveWorldviewList)
+	// elevatorCount := len(slaveWorldviewList)
 	masterMatrix := deepCopyMatrix(masterWorldview.Calls.Matrix)
 	slaveMatrix := slaveWorldview.Calls.Matrix
 	for floor := range masterMatrix {
 		for buttonType := range masterMatrix[floor] {
+			isAssignedSlaveCompleted := isCallAssignedToSlave(masterMatrix[floor][buttonType], slaveWorldview.NetworkID) && slaveMatrix[floor][buttonType] == CallStateCompleted
 			if masterMatrix[floor][buttonType] == CallStateNone && slaveMatrix[floor][buttonType] == CallStateOrder {
 				masterMatrix[floor][buttonType] = CallStateOrder
-			} else if isCallAssignedToAnyone(masterMatrix[floor][buttonType], elevatorCount) &&
-				slaveMatrix[floor][buttonType] == CallStateCompleted &&
-				masterMatrix[floor][buttonType] == CallState(slaveWorldview.NetworkID) {
-
+				fmt.Printf("Updating MasterWorldview from CallStateNone to CallStateOrder from slave %d for floor %d, button type %d\n", slaveWorldview.NetworkID, floor, buttonType)
+			} else if isAssignedSlaveCompleted {
 				masterMatrix[floor][buttonType] = CallStateNone
+				fmt.Printf("Updating MasterWorldview from CallStateAssigned to CallStateNone from slave %d for floor %d, button type %d\n", slaveWorldview.NetworkID, floor, buttonType)
 			}
 		}
 	}

@@ -33,6 +33,8 @@ func Server(
 
 	slaveWorldview := getDefaultSlaveWorldview(networkID, floorCount, buttonTypeCount)
 
+	// setAllLights(slaveWorldview)
+
 	heartbeatTicker := time.NewTicker(HeartbeatInterval)
 	defer heartbeatTicker.Stop()
 	doorOpenTimeout := time.NewTimer(DoorOpenTimeoutDuration)
@@ -50,6 +52,12 @@ func Server(
 	go elevio.PollFloorSensor(floorEventReceiver)
 	go elevio.PollObstructionSwitch(obstructionEventReceiver)
 	go elevio.PollStopButton(stopEventReceiver)
+
+	dontCloseDoor := elevio.GetObstruction()
+
+	if !dontCloseDoor {
+		resetTimer(doorOpenTimeout, DoorOpenTimeoutDuration)
+	}
 
 	if floor := elevio.GetFloor(); floor == -1 {
 		fmt.Println("Elevator started between two floors.")
@@ -101,22 +109,11 @@ func Server(
 		case floor := <-floorEventReceiver:
 			fmt.Println("Floor entered:", floor)
 			onFloorArrival(floor, &slaveWorldview, doorOpenTimeout)
-
+			obstructionHandler(dontCloseDoor, &slaveWorldview, doorOpenTimeout)
 		case isObstructed := <-obstructionEventReceiver:
-			elevator := slaveWorldview
-			fmt.Println("Door obstruction detected:", isObstructed)
-			// TODO: Implementation depends on specific requirements, often pauses the door timer
-			if isObstructed && elevator.Behaviour == BehaviourDoorOpen {
-				elevio.SetDoorOpenLamp(true)
-				if !doorOpenTimeout.Stop() {
-					select {
-					case <-doorOpenTimeout.C:
-					default:
-					}
-				}
-			} else if !isObstructed && elevator.Behaviour == BehaviourDoorOpen {
-				resetTimer(doorOpenTimeout, DoorOpenTimeoutDuration)
-			}
+			fmt.Printf("\nobstructionEventReceiver: isObstructed==%v, setting dontCloseDoor to %v\n", isObstructed, dontCloseDoor)
+			obstructionHandler(isObstructed, &slaveWorldview, doorOpenTimeout)
+			dontCloseDoor = isObstructed
 
 		case isStopped := <-stopEventReceiver:
 			fmt.Println("Stop button event:", isStopped)
@@ -145,6 +142,24 @@ func Server(
 	}
 }
 
+func obstructionHandler(isObstructed bool, elevator *SlaveWorldview, doorOpenTimeout *time.Timer) {
+	fmt.Printf("\nobstructionHandler: isObstructed==%v\n\n", isObstructed)
+	fmt.Println("Door obstruction detected:", isObstructed)
+	// TODO: Implementation depends on specific requirements, often pauses the door timer
+	if isObstructed && elevator.Behaviour == BehaviourDoorOpen {
+		elevio.SetDoorOpenLamp(true)
+		if !doorOpenTimeout.Stop() {
+			select {
+			case <-doorOpenTimeout.C:
+			default:
+			}
+		}
+	} else if !isObstructed && elevator.Behaviour == BehaviourDoorOpen {
+		resetTimer(doorOpenTimeout, DoorOpenTimeoutDuration)
+	}
+
+}
+
 // TODO: This is reused from network_server.go, master.go
 func resetTimer(timer *time.Timer, duration time.Duration) {
 	if !timer.Stop() {
@@ -166,7 +181,7 @@ func getDefaultSlaveWorldview(networkID int, floorCount int, buttonTypeCount int
 	}
 	return SlaveWorldview{
 		NetworkID:        networkID,
-		Behaviour:        BehaviourIdle,
+		Behaviour:        BehaviourDoorOpen,
 		Direction:        elevio.MD_Stop,
 		FloorLastVisited: -1,
 		Calls:            CallsMatrix{Matrix: calls},

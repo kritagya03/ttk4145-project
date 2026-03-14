@@ -110,8 +110,9 @@ acceptance tests
 
 Current errors:
  Poll rate in 10ms, heartbeat is 5 ??
-* when master dies most of the slaves die (but one might become the new master on rare occasions)
-* When any elevator adds a hall call on the same floor as a elevator, that elevator also turns on its cab call light on that floor
+* Changed to CallStateOrder alot of places where it should only be CallStateAssigned
+* Added deep copies
+* Go to previous commit?
 * When a slave is in floor 0, slave has cab calls on floors 1,2,3, slave moving between floor 0 to floor 1, master dies, a cab order on floor 0 spawns.
 
 

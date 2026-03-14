@@ -110,9 +110,11 @@ func Server(masterNetworkCommands <-chan MasterWorldview,
 		case masterCommand := <-masterNetworkCommands:
 			// fmt.Println("network_server.go case masterNetworkCommands.")
 			masterWorldivewTransmit <- masterCommand
+			slaveNetworkEvents <- masterCommand
 		case slaveCommand := <-slaveNetworkCommands:
 			// fmt.Println("network_server.go case slaveNetworkCommands.")
 			slaveWorldviewTransmit <- slaveCommand
+			masterNetworkEvents <- slaveCommand
 		case <-masterHeartbeatTimer.C:
 			fmt.Println("network_server.go case masterHeartbeatTimer.C. Master heartbeat timeout.")
 			masterIsTimedOut = true

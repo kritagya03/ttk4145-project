@@ -260,7 +260,7 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 		isOnline := slaveOnlineList[id]
 		// if !isOnline && masterWorldview.NetworkID != slaveWorldview.NetworkID {
 		if !isOnline {
-			fmt.Printf("Elevator %d is offline. Temporarily excluding from HCA to reassign its orders.\n", slaveWorldview.NetworkID)
+			// fmt.Printf("Elevator %d is offline. Temporarily excluding from HCA to reassign its orders.\n", slaveWorldview.NetworkID) // TODO: useful, but spams the terminal
 			continue
 		}
 
@@ -356,7 +356,7 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 	}
 
 	// Convert HCA output to MasterWorldview format
-	fmt.Println("HCA output:", output)
+	// fmt.Println("HCA output:", output)
 	for networkIDString, assignedCalls := range output {
 		networkID, errorParsingSlaveID := strconv.Atoi(networkIDString)
 		if errorParsingSlaveID != nil {

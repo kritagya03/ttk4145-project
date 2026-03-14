@@ -85,25 +85,25 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 				case masterInactive, masterCandidate:
 					masterWorldview = receivedMasterWorldview
 				case masterMerging:
-					fmt.Println("Received MasterWorldview while in Merging state, merging received MasterWorldview with current MasterWorldview.\n")
+					fmt.Println("Received MasterWorldview while masterMerging. Merging received MasterWorldview with current MasterWorldview.\n")
 					masterWorldview = getMergedMasterWorldview(masterWorldview, receivedMasterWorldview, elevatorCount)
 				}
 
 			case NewMasterConnection:
-				fmt.Printf("master.go case masterNetworkEvents. Received New Master Connection: %d\n", event)
+				// fmt.Printf("master.go case masterNetworkEvents. Received New Master Connection: %d\n", event)
 				switch masterState {
 				case masterCandidate:
-					fmt.Println("master.go case masterNetworkEvents. Received New Master Connection while in Candidate state. Setting master state to masterInactive.\n")
+					fmt.Println("master.go New Master Connection while masterCandidate. Setting masterState to masterInactive.\n")
 					masterState = masterInactive
 				case masterActive:
-					fmt.Println("master.go case masterNetworkEvents. Received New Master Connection while in Active state. Setting master state to masterMerging.\n")
+					fmt.Println("master.go New Master Connection while Active state. Setting master state to masterMerging.\n")
 					masterState = masterMerging
 					resetTimer(mergingMastersTimeout, MergingMastersTimeoutDuration)
 				case masterMerging:
-					fmt.Println("master.go case masterNetworkEvents. Received New Master Connection while in Merging state. Keeping current master state.\n")
+					fmt.Println("master.go New Master Connection while Merging state. Keeping current masterState.\n")
 					resetTimer(mergingMastersTimeout, MergingMastersTimeoutDuration)
 				case masterInactive:
-					fmt.Println("master.go case masterNetworkEvents. Received New Master Connection while in Inactive state. Keeping current master state.\n")
+					fmt.Println("master.go New Master Connection while Inactive state. Keeping current masterState.\n")
 				default:
 					panic(fmt.Sprintf("master.go case masterNetworkEvents. Received unknown event type: %T, value: %v", event, event))
 				}
@@ -303,7 +303,7 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 	}
 
 	if len(elevatorStatesMap) == 0 {
-		fmt.Println("Don't assign calls because no connected or unstuck slaves.\n")
+		// fmt.Println("Don't assign calls because no connected or unstuck slaves.\n")
 		// return unchangedMasterWorldview
 		return masterWorldview
 	}

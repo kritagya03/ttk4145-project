@@ -536,7 +536,7 @@ func getNewSlaveWorldview(slaveWorldview SlaveWorldview, masterWorldview MasterW
 			// TODO: this also implements that slave can go from (assigned to self) to (none) if master says so, but the master should never say so unless some other elevator does the order or the master has lost the order (NEVER LOSE ORDERS)
 
 			if slaveCallState != masterCallState {
-				fmt.Println("slave.go - getNewSlaveWorldview: Detected mismatch in call state for floor ", floor, " button type ", buttonType, ": masterCallState=", masterCallState, " slaveCallState=", slaveCallState, " isMasterCallAssignedToAnyone=", isMasterCallAssignedToAnyone, " isSlaveCallAssignedToAnyone=", isSlaveCallAssignedToAnyone, "\n")
+				fmt.Println("slave.go getNewSlaveWorldview: Mismatched CallState for floor ", floor, " button type ", buttonType, ": masterCallState=", masterCallState, " slaveCallState=", slaveCallState, " isMasterCallAssignedToAnyone=", isMasterCallAssignedToAnyone, " isSlaveCallAssignedToAnyone=", isSlaveCallAssignedToAnyone)
 			}
 
 			// if slaveCallState != CallStateNone {

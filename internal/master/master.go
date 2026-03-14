@@ -154,6 +154,16 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 	}
 }
 
+// TODO: used in master.go, slave.go, network_server.go
+func deepCopyMatrix(matrix [][]CallState) [][]CallState {
+	newMatrix := make([][]CallState, len(matrix))
+	for i := range matrix {
+		newMatrix[i] = make([]CallState, len(matrix[i]))
+		copy(newMatrix[i], matrix[i])
+	}
+	return newMatrix
+}
+
 // func isActiveCall(callState CallState, elevatorCount int) bool {
 // 	return callState == CallStateOrder || isCallAssignedToAnyone(callState, elevatorCount)
 // }
@@ -161,7 +171,7 @@ func Server(masterNetworkEvents <-chan interface{}, masterNetworkCommands chan<-
 // TODO: weird to have elevatorCount as an argument to the function.
 func getMergedMasterWorldview(masterWorldviewBase MasterWorldview, masterWorldviewNew MasterWorldview, elevatorCount int) MasterWorldview {
 	masterWorldviewMerged := masterWorldviewBase
-	matrixMerged := masterWorldviewMerged.Calls.Matrix
+	matrixMerged := deepCopyMatrix(masterWorldviewMerged.Calls.Matrix)
 	matrixNew := masterWorldviewNew.Calls.Matrix
 	// TODO: currently assuming both matrixes have the same dimensions
 	for floor := range matrixNew {
@@ -210,7 +220,7 @@ func isCallAssignedToAnyone(callState CallState, elevatorCount int) bool {
 // TODO: assumes master matrix and slave matrix are of the same dimensions
 func getNewMasterWorldview(masterWorldview MasterWorldview, slaveWorldview SlaveWorldview, slaveWorldviewList []SlaveWorldview, slaveOnlineList []bool, slaveLastStateChange []time.Time) MasterWorldview {
 	elevatorCount := len(slaveWorldviewList)
-	masterMatrix := masterWorldview.Calls.Matrix
+	masterMatrix := deepCopyMatrix(masterWorldview.Calls.Matrix)
 	slaveMatrix := slaveWorldview.Calls.Matrix
 	for floor := range masterMatrix {
 		for buttonType := range masterMatrix[floor] {
@@ -366,6 +376,7 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 
 	// Convert HCA output to MasterWorldview format
 	// fmt.Println("HCA output:", output)
+	masterMatrix := deepCopyMatrix(masterWorldview.Calls.Matrix)
 	for networkIDString, assignedCalls := range output {
 		networkID, errorParsingSlaveID := strconv.Atoi(networkIDString)
 		if errorParsingSlaveID != nil {
@@ -379,10 +390,10 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 				if assignedCalls[floor][buttonType] {
 					switch buttonType {
 					case assignedCallHallUpIndex, assignedCallHallDownIndex:
-						masterWorldview.Calls.Matrix[floor][buttonType] = CallState(networkID)
+						masterMatrix[floor][buttonType] = CallState(networkID)
 					case assignedCallCabCallIndex:
 						masterMatrixCabCallIndex := 2 + networkID - 1 // TODO: Maybe not hardcode 2. Cab calls start after the hall calls in the button type indexing.
-						masterWorldview.Calls.Matrix[floor][masterMatrixCabCallIndex] = CallState(networkID)
+						masterMatrix[floor][masterMatrixCabCallIndex] = CallState(networkID)
 					default:
 						panic(fmt.Sprintf("Invalid button type index from HCA output: %d", buttonType))
 					}
@@ -390,6 +401,7 @@ func assignCalls(masterWorldview MasterWorldview, slaveWorldviewList []SlaveWorl
 			}
 		}
 	}
+	masterWorldview.Calls.Matrix = masterMatrix
 
 	// fmt.Println("Updated MasterWorldview after hall call assignment:", masterWorldview)
 

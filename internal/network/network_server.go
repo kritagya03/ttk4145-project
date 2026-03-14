@@ -33,6 +33,31 @@ func resetTimer(timer *time.Timer) {
 	// fmt.Println("network_server.go resetTimer - Timer has been reset.")
 }
 
+// TODO: used in master.go, slave.go, network_server.go
+func deepCopyMatrix(matrix [][]CallState) [][]CallState {
+	newMatrix := make([][]CallState, len(matrix))
+	for i := range matrix {
+		newMatrix[i] = make([]CallState, len(matrix[i]))
+		copy(newMatrix[i], matrix[i])
+	}
+	return newMatrix
+}
+
+func deepCopyWorldview[worldviewType MasterWorldview | SlaveWorldview](worldview worldviewType) interface{} {
+	// worldview.Calls.Matrix = deepCopyMatrix(worldview.Calls.Matrix)
+	// return worldview
+	newWorldview := worldview
+	switch worldviewWithType := any(newWorldview).(type) {
+	case MasterWorldview:
+		worldviewWithType.Calls.Matrix = deepCopyMatrix(worldviewWithType.Calls.Matrix)
+		return worldviewWithType
+	case SlaveWorldview:
+		worldviewWithType.Calls.Matrix = deepCopyMatrix(worldviewWithType.Calls.Matrix)
+		return worldviewWithType
+	}
+	return newWorldview
+}
+
 // TODO: Add NewSlaveConnection
 
 func Server(masterNetworkCommands <-chan MasterWorldview,
@@ -91,7 +116,7 @@ func Server(masterNetworkCommands <-chan MasterWorldview,
 				masterNetworkEvents <- NewMasterConnection(0)
 				masterIsTimedOut = false
 			}
-			
+
 			// fmt.Printf("network_server.go case masterWorldviewReceive. Sending MasterWorldview to slaveNetworkEvents channel. worldview = %v\n", worldview)
 			masterNetworkEvents <- worldview // Combining multiple masters after network partition
 			slaveNetworkEvents <- worldview
@@ -114,10 +139,12 @@ func Server(masterNetworkCommands <-chan MasterWorldview,
 			// fmt.Printf("network_server.go case slaveWorldviewReceive. Reset slave heartbeat timer for NetworkID %d\n", worldview.NetworkID)
 		case masterCommand := <-masterNetworkCommands:
 			// fmt.Println("network_server.go case masterNetworkCommands.")
+			masterCommand = deepCopyWorldview(masterCommand).(MasterWorldview)
 			masterWorldivewTransmit <- masterCommand
 			slaveNetworkEvents <- masterCommand
 		case slaveCommand := <-slaveNetworkCommands:
 			// fmt.Println("network_server.go case slaveNetworkCommands.")
+			slaveCommand = deepCopyWorldview(slaveCommand).(SlaveWorldview)
 			slaveWorldviewTransmit <- slaveCommand
 			masterNetworkEvents <- slaveCommand
 		case <-masterHeartbeatTimeout.C:

@@ -488,7 +488,7 @@ func clearIfAssigned(callState CallState, networkID int) CallState {
 
 func clearServedCallsAtCurrentFloor(elevator SlaveWorldview) SlaveWorldview {
 	floor := elevator.FloorLastVisited
-	matrix := elevator.Calls.Matrix
+	matrix := deepCopyMatrix(elevator.Calls.Matrix)
 	networkID := elevator.NetworkID
 
 	cabIndex := buttonTypeToMatrixIndex(elevio.BT_Cab, networkID)
@@ -517,13 +517,24 @@ func clearServedCallsAtCurrentFloor(elevator SlaveWorldview) SlaveWorldview {
 		matrix[floor][hallDownIndex] = clearIfAssigned(matrix[floor][hallDownIndex], networkID)
 	}
 
+	elevator.Calls.Matrix = matrix
 	return elevator
+}
+
+// TODO: used in master.go, slave.go, network_server.go
+func deepCopyMatrix(matrix [][]CallState) [][]CallState {
+	newMatrix := make([][]CallState, len(matrix))
+	for i := range matrix {
+		newMatrix[i] = make([]CallState, len(matrix[i]))
+		copy(newMatrix[i], matrix[i])
+	}
+	return newMatrix
 }
 
 // TODO: assumes master matrix and slave matrix are of the same dimensions
 // ! TODO: many bugs are caused by this function
 func getNewSlaveWorldview(slaveWorldview SlaveWorldview, masterWorldview MasterWorldview) SlaveWorldview {
-	slaveMatrix := slaveWorldview.Calls.Matrix
+	slaveMatrix := deepCopyMatrix(slaveWorldview.Calls.Matrix)
 	masterMatrix := masterWorldview.Calls.Matrix
 	for floor := range slaveMatrix {
 		for buttonType := range slaveMatrix[floor] {

@@ -2,7 +2,27 @@
 
 TTK4145 elevator project at NTNU, made with Joachim Frydenlund and Henrik Markestad :)
 
-## How to run
+## How to run for first time
+
+In one terminal:
+```sh
+elevatorserver
+```
+
+In another terminal:
+```sh
+sudo apt update && sudo apt install golang git -yy
+mkdir sanntid-2026-vaar-gruppe45
+cd sanntid-2026-vaar-gruppe45
+git clone https://github.com/kritagya03/ttk4145-project.git
+cd ttk4145-project
+chmod +x bin/hall_call_assigner
+go mod download
+cd cmd/elevator
+go run ./main.go -network-id 1
+```
+
+## How to run for testing
 
 ```sh
 elevatorserver

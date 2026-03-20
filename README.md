@@ -11,14 +11,14 @@ In this project we have created real-time software for controlling `n` elevators
 
 ## How to Run
 
-The code is run by first running the elevatorserver on one terminal:
+The code is run by first running the elevatorserver from one terminal:
 
 ```sh
 # Teminal 1
 elevatorserver --port [hardware-port]
 ```
 
-Then navigating to `./ttk4145-project/cmd/elevator` and running the main file on another terminal:
+Then in another terminal, navigate to `./final-code-45/cmd/elevator` and run the main file:
 
 ```sh
 # Terminal 2

@@ -22,7 +22,7 @@ Then navigating to `./ttk4145-project/cmd/elevator` and running the main file on
 
 ```sh
 # Terminal 2
-go run ./main.go -network-id [network-id] -harware-port [harware-port]
+go run ./main.go -network-id [network-id] -hardware-port [hardware-port]
 ```
 
 `-network-id` is a required command line argument, while the rest have default values. For more detailed usage, like how to add more floors and elevators to the system, see:

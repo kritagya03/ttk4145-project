@@ -18,7 +18,7 @@ The code is run by first running the elevatorserver from one terminal:
 elevatorserver --port [hardware-port]
 ```
 
-Then in another terminal, navigate to `./final-code-45/cmd/elevator` and run the main file:
+Then in another terminal, navigate to `./ttk4145-project/cmd/elevator` and run the main file:
 
 ```sh
 # Terminal 2
